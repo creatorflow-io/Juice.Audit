@@ -49,10 +49,10 @@ namespace Juice.Audit.AspNetCore.Middleware
 
             try
             {
-                CollectRequestInfo(auditContextAccessor, context);
+                PreRequestCollectInfo(auditContextAccessor, context);
                 if (dbg)
                 {
-                    logger.LogDebug("AuditMiddleware.InvokeAsync: CollectRequestInfo {0}", timeTracker.ElapsedMilliseconds);
+                    logger.LogDebug("AuditMiddleware.InvokeAsync: PreRequestCollectInfo {0}", timeTracker.ElapsedMilliseconds);
                     timeTracker.Restart();
                 }
             }
@@ -61,19 +61,6 @@ namespace Juice.Audit.AspNetCore.Middleware
                 logger.LogWarning(ex, "Error while collecting the request information");
             }
 
-            try
-            {
-                CollectServerInfo(auditContextAccessor);
-                if (dbg)
-                {
-                    logger.LogDebug("AuditMiddleware.InvokeAsync: CollectServerInfo {0}", timeTracker.ElapsedMilliseconds);
-                    timeTracker.Restart();
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Error while collecting the server information");
-            }
             bool isMatch = false;
             try
             {
@@ -89,7 +76,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     try
                     {
-                        CollectResponseInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds);
+                        PostRequestColllectInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds);
                         if (dbg)
                         {
                             logger.LogDebug("AuditMiddleware.InvokeAsync: CollectResponseInfo {0}", timeTracker.ElapsedMilliseconds);
@@ -114,7 +101,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 isMatch = true;
                 try
                 {
-                    CollectResponseInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds, ex);
+                    PostRequestColllectInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds, ex);
                     if (dbg)
                     {
                         logger.LogDebug("AuditMiddleware.InvokeAsync: CollectResponseError {0}", timeTracker.ElapsedMilliseconds);
@@ -178,7 +165,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             var requestInfo = new RequestInfo(
                 context.Request.Method,
                 context.Request.Path,
-                context.Request.HasFormContentType ? JsonConvert.SerializeObject(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)) : default,
+                default,
                 context.Request.QueryString.HasValue ? context.Request.QueryString.Value : default,
                 JsonConvert.SerializeObject(context.Request.Headers
                     .Where(h => _filter.IsReqHeaderMatch(h.Key))
@@ -205,9 +192,20 @@ namespace Juice.Audit.AspNetCore.Middleware
             auditContextAccessor.AuditContext?.SetServerInfo(serverInfo);
         }
 
-        private void CollectResponseInfo(IAuditContextAccessor auditContextAccessor,
+        private void PreRequestCollectInfo(IAuditContextAccessor auditContextAccessor,
+            HttpContext context)
+        {
+            CollectRequestInfo(auditContextAccessor, context);
+            CollectServerInfo(auditContextAccessor);
+        }
+
+        private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context, long elapsed, Exception? ex = default)
         {
+            if (context.Request.HasFormContentType)
+            {
+                auditContextAccessor.AuditContext?.AccessRecord?.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
+            }
             auditContextAccessor.AuditContext?.UpdateResponseInfo(responseInfo =>
             {
                 if (ex != null)
