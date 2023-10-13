@@ -22,7 +22,7 @@ namespace Juice.Audit.AspNetCore.Extensions
 
             if (options.Filters.Length == 0)
             {
-                app.UseMiddleware<AuditMiddleware>();
+                app.UseMiddleware<AuditMiddleware>(appName, options);
             }
             else
             {
@@ -30,7 +30,7 @@ namespace Juice.Audit.AspNetCore.Extensions
                         options.IsMatch(
                             context.Request.Path, context.Request.Method
                             ),
-                            appBuilder => appBuilder.UseMiddleware<AuditMiddleware>(appName)
+                            appBuilder => appBuilder.UseMiddleware<AuditMiddleware>(appName, options)
                 );
             }
             return app;
@@ -46,22 +46,7 @@ namespace Juice.Audit.AspNetCore.Extensions
         public static WebApplication UseAudit(this WebApplication app,
             string appName, Action<AuditFilterOptions>? configure = default)
         {
-            var options = new AuditFilterOptions();
-            configure?.Invoke(options);
-
-            if (options.Filters.Length == 0)
-            {
-                app.UseMiddleware<AuditMiddleware>(appName, options);
-            }
-            else
-            {
-                app.UseWhen(context =>
-                        options.IsMatch(
-                            context.Request.Path, context.Request.Method
-                            ),
-                            appBuilder => appBuilder.UseMiddleware<AuditMiddleware>(appName, options)
-                );
-            }
+            ((IApplicationBuilder)app).UseAudit(appName, configure);
             return app;
         }
 
