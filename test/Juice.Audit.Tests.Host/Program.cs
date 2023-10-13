@@ -1,5 +1,6 @@
 ﻿using Juice.Audit;
 using Juice.Audit.AspNetCore.Extensions;
+using Juice.Audit.AspNetCore.Middleware;
 using Juice.Audit.EF;
 using Juice.EF;
 using Juice.EF.Extensions;
@@ -37,12 +38,17 @@ var app = builder.Build();
 
 app.UseStaticFiles();
 
+var configs = new AuditFilterOptions();
+builder.Configuration.Bind("Audit", configs);
+
 app.UseAudit("XUnitTest", options =>
 {
-    options.Include("", "POST");
+    options.Include(string.Empty, "POST", "PUT", "DELETE");
     options.Include("/audit", "GET");
     options.Exclude("/Index");
     options.Include("", new int[] { 403 });
+    options.Merge(configs.Filters);
+    Console.WriteLine("Filters count: " + options.Filters.Length);
 });
 
 app.MapRazorPages();

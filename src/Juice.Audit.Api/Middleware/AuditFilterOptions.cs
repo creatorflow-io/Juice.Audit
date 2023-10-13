@@ -74,6 +74,14 @@
             return this;
         }
 
+        public AuditFilterOptions Merge(params PathFilterEntry[] entries)
+        {
+            var newFilters = new List<PathFilterEntry>(Filters);
+            newFilters.AddRange(entries.Where(e => !IsExists(e) || e.Priority != 0).ToArray());
+            Filters = newFilters.ToArray();
+            return this;
+        }
+
         public bool IsMatch(string path, string method)
             => IsMatch(path, method, out var _);
         public bool IsMatch(string path, string method, out string? rule)
@@ -116,6 +124,16 @@
             }
             rule = null;
             return false;
+        }
+
+        public bool IsExists(PathFilterEntry entry)
+        {
+            return Filters.Any(f => (f.Path == entry.Path || (f.IsGlobal && entry.IsGlobal))
+                           && f.Methods.Length == entry.Methods.Length
+                                          && f.Methods.All(m => entry.Methods.Contains(m, new StringComparer()))
+                                                         && f.StatusCodes.Length == entry.StatusCodes.Length
+                                                                        && f.StatusCodes.All(s => entry.StatusCodes.Contains(s))
+                                                                                       && f.IsExcluded == entry.IsExcluded);
         }
 
         public string[] ReqHeaders = new string[] {
