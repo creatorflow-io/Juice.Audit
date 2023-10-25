@@ -2,6 +2,7 @@
 {
     public class AuditFilterOptions
     {
+        public int RequestAbortedStatusCode { get; set; } = 408;
         public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();
 
         public AuditFilterOptions Clear()

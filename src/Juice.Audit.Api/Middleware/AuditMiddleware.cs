@@ -71,7 +71,11 @@ namespace Juice.Audit.AspNetCore.Middleware
                     timeTracker.Restart();
                 }
 
-                isMatch = _filter.IsMatch(context.Request.Path, context.Request.Method, context.Response.StatusCode);
+                var status = context.RequestAborted.IsCancellationRequested
+                    ? _filter.RequestAbortedStatusCode
+                    : context.Response.StatusCode;
+
+                isMatch = _filter.IsMatch(context.Request.Path, context.Request.Method, status);
                 if (isMatch)
                 {
                     try
@@ -213,7 +217,16 @@ namespace Juice.Audit.AspNetCore.Middleware
                     responseInfo.TrySetMessage(ex.Message);
                     responseInfo.TrySetError(ex.StackTrace ?? ex.ToString());
                 }
-                responseInfo.SetResponseInfo(context.Response.StatusCode,
+                else if (context.RequestAborted.IsCancellationRequested)
+                {
+                    responseInfo.TrySetMessage("Request aborted");
+                }
+
+                var status = context.RequestAborted.IsCancellationRequested
+                    ? _filter.RequestAbortedStatusCode
+                    : context.Response.StatusCode;
+
+                responseInfo.SetResponseInfo(status,
                     JsonConvert.SerializeObject(context.Response.Headers
                         .Where(h => _filter.IsResHeaderMatch(h.Key))
                         .ToDictionary(x => x.Key, x => x.Value)),
