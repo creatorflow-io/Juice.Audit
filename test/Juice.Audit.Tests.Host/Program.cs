@@ -103,6 +103,16 @@ app.MapGet("/audit", async (ctx) =>
             }));
 });
 
+
+app.MapGet("/cancel", async (ctx) =>
+{
+    await Task.Delay(TimeSpan.FromMinutes(1));
+    ctx.Response.StatusCode = 200;
+    await ctx.Response.WriteAsync("ok");
+});
+
+
+
 app.MapGet("/err/403", async (ctx) =>
 {
     ctx.Response.StatusCode = 403;
