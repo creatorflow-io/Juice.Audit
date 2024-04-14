@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using Juice.Audit.Domain.AccessLogAggregate;
+using Juice.Domain;
 
 namespace Juice.Audit.Tests.Host.Mockservices
 {
@@ -10,6 +11,9 @@ namespace Juice.Audit.Tests.Host.Mockservices
         {
             _logger = logger;
         }
+
+        public IUnitOfWork UnitOfWork => throw new NotImplementedException();
+
         public Task<IOperationResult<AccessLog>> AddAsync(AccessLog entity, CancellationToken token)
         {
             _logger.LogInformation("AccessRecord was added!");

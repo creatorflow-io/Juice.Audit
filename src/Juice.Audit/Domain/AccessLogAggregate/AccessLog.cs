@@ -5,7 +5,7 @@ using Newtonsoft.Json.Linq;
 
 namespace Juice.Audit.Domain.AccessLogAggregate
 {
-    public class AccessLog : AggregrateRoot<INotification>
+    public class AccessLog : AggregateRoot<INotification>
     {
         public AccessLog() { }
         public AccessLog(string action, string? user)
