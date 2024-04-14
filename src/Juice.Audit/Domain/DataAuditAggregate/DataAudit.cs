@@ -3,7 +3,7 @@ using MediatR;
 
 namespace Juice.Audit.Domain.DataAuditAggregate
 {
-    public class DataAudit : AggregrateRoot<INotification>
+    public class DataAudit : AggregateRoot<INotification>
     {
         public DataAudit() { }
         public DataAudit(string? user, DateTimeOffset dateTime, string action, string? database, string? schema, string table, string keyValues, string dataChanges, string? traceId)

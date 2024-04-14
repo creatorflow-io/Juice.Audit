@@ -6,14 +6,16 @@ namespace Juice.Audit.EF.Repositories
     internal class DataAuditRepository : RepositoryBase<DataAudit, AuditDbContext>,
         IDataAuditRepository
     {
+        private readonly AuditDbContext _context;
         public DataAuditRepository(AuditDbContext context) : base(context)
         {
+            _context = context;
         }
 
         public Task AddRangeAsync(IEnumerable<DataAudit> auditEntries, CancellationToken token)
         {
-            Context.AuditEntries.AddRange(auditEntries);
-            return Context.SaveChangesAsync(token);
+            _context.AuditEntries.AddRange(auditEntries);
+            return _context.SaveChangesAsync(token);
         }
     }
 }
