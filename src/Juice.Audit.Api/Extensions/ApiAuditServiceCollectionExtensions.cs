@@ -16,7 +16,7 @@ namespace Microsoft.Extensions.DependencyInjection
         /// <returns></returns>
         public static IServiceCollection AddDataEventHandler(this IServiceCollection services)
         {
-            services.AddScoped<INotificationHandler<DataEvent>, DataEvenNotificationtHandler>();
+            services.AddScoped(typeof(INotificationHandler<>), typeof(DataEvenNotificationtHandler<>));
             return services;
         }
 

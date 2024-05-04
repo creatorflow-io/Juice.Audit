@@ -2,6 +2,7 @@
 using Juice.Audit.AspNetCore.Extensions;
 using Juice.Audit.AspNetCore.Middleware;
 using Juice.Audit.EF;
+using Juice.Domain;
 using Juice.EF;
 using Juice.EF.Extensions;
 using MediatR;
@@ -63,12 +64,11 @@ app.MapGet("/audit", async (ctx) =>
 {
     var mediator = ctx.RequestServices.GetRequiredService<IMediator>();
     await mediator.Publish(new DataEvent("Inserted")
-        .SetAuditRecord(new AuditRecord
+        .SetAuditRecord(new AuditRecord("test")
         {
             User = "test",
             Database = "test",
             Schema = "test",
-            Table = "test",
             KeyValues = new Dictionary<string, object?>
             {
                 { "Id", Guid.NewGuid() }
@@ -83,12 +83,11 @@ app.MapGet("/audit", async (ctx) =>
         }));
 
     await mediator.Publish(new DataEvent("Inserted")
-            .SetAuditRecord(new AuditRecord
+            .SetAuditRecord(new AuditRecord("test1")
             {
                 User = "test",
                 Database = "test",
                 Schema = "test",
-                Table = "test1",
                 KeyValues = new Dictionary<string, object?>
                 {
                 { "Id", Guid.NewGuid() }
