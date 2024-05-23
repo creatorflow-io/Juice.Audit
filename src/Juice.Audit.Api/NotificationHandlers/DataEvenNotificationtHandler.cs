@@ -1,11 +1,11 @@
-﻿using Juice.Domain;
+﻿using Juice.Domain.Events;
 using MediatR;
 using Newtonsoft.Json;
 
 namespace Juice.Audit.Api.NotificationHandlers
 {
     internal class DataEvenNotificationtHandler<T> : INotificationHandler<T>
-        where T : DataEvent
+        where T : AuditEvent
     {
         private IAuditContextAccessor _auditContextAccessor;
 

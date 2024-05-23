@@ -2,8 +2,7 @@
 using Juice.Audit.AspNetCore.Extensions;
 using Juice.Audit.AspNetCore.Middleware;
 using Juice.Audit.EF;
-using Juice.Domain;
-using Juice.EF;
+using Juice.Domain.Events;
 using Juice.EF.Extensions;
 using MediatR;
 
