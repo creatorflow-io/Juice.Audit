@@ -17,7 +17,7 @@ namespace Juice.Audit.Tests.Host.Mockservices
         public Task<IOperationResult<AccessLog>> AddAsync(AccessLog entity, CancellationToken token)
         {
             _logger.LogInformation("AccessRecord was added!");
-            return Task.FromResult((IOperationResult<AccessLog>)OperationResult<AccessLog>.Result(entity));
+            return Task.FromResult(OperationResult.Result(entity));
         }
         public Task<IOperationResult> DeleteAsync(AccessLog entity, CancellationToken token) => throw new NotImplementedException();
         public Task<AccessLog?> FindAsync(Expression<Func<AccessLog, bool>> predicate, CancellationToken token) => throw new NotImplementedException();

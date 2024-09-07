@@ -17,7 +17,7 @@ namespace Juice.Audit.Tests.Host.Mockservices
         public Task<IOperationResult<DataAudit>> AddAsync(DataAudit entity, CancellationToken token)
         {
             _logger.LogInformation("AuditEntry was added!");
-            return Task.FromResult((IOperationResult<DataAudit>)OperationResult<DataAudit>.Result(entity));
+            return Task.FromResult(OperationResult.Result(entity));
         }
         public Task AddRangeAsync(IEnumerable<DataAudit> auditEntries, CancellationToken token)
         {
