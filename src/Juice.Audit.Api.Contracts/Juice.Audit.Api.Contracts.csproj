@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Juice" Version="$(JuiceRefVersion)" />
+        <PackageReference Include="Juice" Version="$(JuiceVersion)" />
     </ItemGroup>
 
     <ItemGroup Label="gRPC">

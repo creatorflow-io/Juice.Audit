@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Juice.EF" Version="$(JuiceRefVersion)" />
+        <PackageReference Include="Juice.EF" Version="$(JuiceVersion)" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit\Juice.Audit.csproj" />
