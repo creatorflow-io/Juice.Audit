@@ -4,6 +4,7 @@
     <TargetFrameworks>$(AppTargetFramework)</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>30b02175-f7c8-4965-a29b-6ac5d4f9bcf5</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
