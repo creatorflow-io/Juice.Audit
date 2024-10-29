@@ -29,5 +29,6 @@
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="$(EFVersion)" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EFVersion)" />
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="$(NpgsqlVersion)" />
+        <PackageReference Include="System.Text.Json" Version="$(MicrosoftExtensionsVersion)"/>
     </ItemGroup>
 </Project>
