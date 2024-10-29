@@ -56,7 +56,7 @@ app.MapRazorPages();
 app.MapGet("/", async (ctx) =>
 {
     var auditContext = ctx.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext;
-    await ctx.Response.WriteAsync(auditContext?.AccessRecord?.Server?.App ?? "");
+    await ctx.Response.WriteAsync(auditContext.AccessRecord.Server?.App ?? "");
 });
 
 app.MapGet("/audit", async (ctx) =>

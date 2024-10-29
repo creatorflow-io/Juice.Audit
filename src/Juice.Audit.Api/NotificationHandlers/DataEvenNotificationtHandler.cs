@@ -19,7 +19,7 @@ namespace Juice.Audit.Api.NotificationHandlers
             var auditRecord = notification.AuditRecord;
             if (auditRecord != null)
             {
-                _auditContextAccessor.AuditContext?.AddAuditEntries(new Domain.DataAuditAggregate.DataAudit(
+                _auditContextAccessor.AuditContext.AddAuditEntries(new Domain.DataAuditAggregate.DataAudit(
                     auditRecord.User,
                     DateTimeOffset.UtcNow,
                     notification.Name,
@@ -28,7 +28,7 @@ namespace Juice.Audit.Api.NotificationHandlers
                     auditRecord.Table,
                     JsonConvert.SerializeObject(auditRecord.KeyValues),
                     JsonConvert.SerializeObject(new { auditRecord.OriginalValues, auditRecord.CurrentValues }),
-                    _auditContextAccessor.AuditContext?.AccessRecord?.TraceId
+                    _auditContextAccessor.AuditContext.AccessRecord.TraceId
                     ));
             }
             return Task.CompletedTask;

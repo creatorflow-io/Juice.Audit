@@ -2,7 +2,7 @@
 {
     public interface IAuditContextAccessor : IDisposable
     {
-        AuditContext? AuditContext { get; }
+        AuditContext AuditContext { get; }
         void Init(string action, string? user);
     }
 }

@@ -75,7 +75,9 @@ namespace Juice.Audit.AspNetCore.Middleware
                     ? _filter.RequestAbortedStatusCode
                     : context.Response.StatusCode;
 
-                isMatch = _filter.IsMatch(context.Request.Path, context.Request.Method, status);
+                isMatch = auditContextAccessor.AuditContext.IsRequestedForAccess
+                    || auditContextAccessor.AuditContext.IsRequestedForAudit
+                    || _filter.IsMatch(context.Request.Path, context.Request.Method, status);
                 if (isMatch)
                 {
                     try
@@ -130,7 +132,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                             logger.LogDebug("AuditMiddleware.InvokeAsync: Get IAuditService {0}", timeTracker.ElapsedMilliseconds);
                             timeTracker.Restart();
                         }
-                        if (auditService != null && auditContextAccessor.AuditContext?.AccessRecord != null)
+                        if (auditService != null)
                         {
                             await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
                                 auditContextAccessor.AuditContext.AuditEntries.ToArray(), default);
@@ -183,7 +185,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 context.Request.Host.HasValue ? context.Request.Host.Value : default
                 )
            ;
-            auditContextAccessor.AuditContext?.SetRequestInfo(requestInfo);
+            auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
         }
 
         private void CollectServerInfo(IAuditContextAccessor auditContextAccessor)
@@ -196,7 +198,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 fvi?.ProductVersion ?? assembly?.GetName()?.Version?.ToString(),
                 _appName
                 );
-            auditContextAccessor.AuditContext?.SetServerInfo(serverInfo);
+            auditContextAccessor.AuditContext.SetServerInfo(serverInfo);
         }
 
         private void PreRequestCollectInfo(IAuditContextAccessor auditContextAccessor,
@@ -211,9 +213,9 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             if (context.Request.HasFormContentType)
             {
-                auditContextAccessor.AuditContext?.AccessRecord?.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
+                auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
             }
-            auditContextAccessor.AuditContext?.UpdateResponseInfo(responseInfo =>
+            auditContextAccessor.AuditContext.UpdateResponseInfo(responseInfo =>
             {
                 if (ex != null)
                 {
@@ -239,7 +241,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             if (context.Response.StatusCode == StatusCodes.Status401Unauthorized
                 || context.Response.StatusCode == StatusCodes.Status403Forbidden)
             {
-                auditContextAccessor.AuditContext?.AccessRecord?.Restricted();
+                auditContextAccessor.AuditContext.AccessRecord.Restricted();
             }
         }
 
