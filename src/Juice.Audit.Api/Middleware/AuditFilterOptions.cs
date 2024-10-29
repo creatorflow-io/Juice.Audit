@@ -2,6 +2,7 @@
 {
     public class AuditFilterOptions
     {
+        public int ExecutionTimeThreshold { get; set; } = 1000;
         public int RequestAbortedStatusCode { get; set; } = 408;
         public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();
 
