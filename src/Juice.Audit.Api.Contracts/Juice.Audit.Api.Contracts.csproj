@@ -13,6 +13,7 @@
 
     <ItemGroup>
         <PackageReference Include="Juice" Version="$(JuiceVersion)" />
+        <PackageReference Include="System.Text.Json" Version="$(MicrosoftExtensionsVersion)"/>
     </ItemGroup>
 
     <ItemGroup Label="gRPC">
