@@ -9,7 +9,7 @@ namespace Juice.Audit
         public bool IsRequestedForAccess { get; private set; }
         public bool IsRequestedForAudit => AuditEntries.Count > 0;
         public AccessLog AccessRecord { get; private set; }
-        public List<DataAudit> AuditEntries { get; private set; } = new List<DataAudit>();
+        public List<DataAudit> AuditEntries { get; private set; } = [];
 
         public AuditContext(string action, string? user)
         {

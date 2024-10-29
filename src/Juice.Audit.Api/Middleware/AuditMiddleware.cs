@@ -2,6 +2,8 @@
 using System.Reflection;
 using System.Security.Claims;
 using Juice.Audit.Domain.AccessLogAggregate;
+using Juice.Measurement;
+using Juice.Measurement.Internal;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -27,20 +29,12 @@ namespace Juice.Audit.AspNetCore.Middleware
             using var auditContextAccessor = context.RequestServices.GetRequiredService<IAuditContextAccessor>();
             var logger = context.RequestServices.GetRequiredService<ILogger<AuditMiddleware>>();
 
-            var totalTimeTracker = new Stopwatch();
-            var timeTracker = new Stopwatch();
-            var dbg = logger.IsEnabled(LogLevel.Debug);
-            timeTracker.Start();
-            totalTimeTracker.Start();
+            using var tracker = context.RequestServices.GetService<ITimeTracker>() ?? new TimeTracker();
 
             try
             {
                 InitAuditContext(auditContextAccessor, context);
-                if (dbg)
-                {
-                    logger.LogDebug("AuditMiddleware.InvokeAsync: InitAuditContext {0}", timeTracker.ElapsedMilliseconds);
-                    timeTracker.Restart();
-                }
+                tracker.Checkpoint("InitAuditContext");
             }
             catch (Exception ex)
             {
@@ -50,11 +44,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             try
             {
                 PreRequestCollectInfo(auditContextAccessor, context);
-                if (dbg)
-                {
-                    logger.LogDebug("AuditMiddleware.InvokeAsync: PreRequestCollectInfo {0}", timeTracker.ElapsedMilliseconds);
-                    timeTracker.Restart();
-                }
+                tracker.Checkpoint("PreRequestCollectInfo");
             }
             catch (Exception ex)
             {
@@ -65,11 +55,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             try
             {
                 await _next(context);
-                if (dbg)
-                {
-                    logger.LogDebug("AuditMiddleware.InvokeAsync: _next {0}", timeTracker.ElapsedMilliseconds);
-                    timeTracker.Restart();
-                }
+                tracker.Checkpoint("Next");
 
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
@@ -77,17 +63,15 @@ namespace Juice.Audit.AspNetCore.Middleware
 
                 isMatch = auditContextAccessor.AuditContext.IsRequestedForAccess
                     || auditContextAccessor.AuditContext.IsRequestedForAudit
+                    || tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold
                     || _filter.IsMatch(context.Request.Path, context.Request.Method, status);
                 if (isMatch)
                 {
                     try
                     {
-                        PostRequestColllectInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds);
-                        if (dbg)
-                        {
-                            logger.LogDebug("AuditMiddleware.InvokeAsync: CollectResponseInfo {0}", timeTracker.ElapsedMilliseconds);
-                            timeTracker.Restart();
-                        }
+                        PostRequestColllectInfo(auditContextAccessor, context, tracker);
+
+                        tracker.Checkpoint("PostRequestColllectInfo");
                     }
                     catch (Exception ex)
                     {
@@ -96,7 +80,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 }
                 else
                 {
-                    if (dbg)
+                    if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because response status does not match");
                     }
@@ -107,12 +91,8 @@ namespace Juice.Audit.AspNetCore.Middleware
                 isMatch = true;
                 try
                 {
-                    PostRequestColllectInfo(auditContextAccessor, context, totalTimeTracker.ElapsedMilliseconds, ex);
-                    if (dbg)
-                    {
-                        logger.LogDebug("AuditMiddleware.InvokeAsync: CollectResponseError {0}", timeTracker.ElapsedMilliseconds);
-                        timeTracker.Restart();
-                    }
+                    PostRequestColllectInfo(auditContextAccessor, context, tracker, ex);
+                    tracker.Checkpoint("PostRequestColllectInfo exception");
                 }
                 catch (Exception ex1)
                 {
@@ -127,19 +107,20 @@ namespace Juice.Audit.AspNetCore.Middleware
                     try
                     {
                         var auditService = context.RequestServices.GetService<IAuditService>();
-                        if (dbg)
-                        {
-                            logger.LogDebug("AuditMiddleware.InvokeAsync: Get IAuditService {0}", timeTracker.ElapsedMilliseconds);
-                            timeTracker.Restart();
-                        }
+                        tracker.Checkpoint("GetAuditService");
+                        
                         if (auditService != null)
                         {
                             await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
                                 auditContextAccessor.AuditContext.AuditEntries.ToArray(), default);
-                        }
-                        if (dbg)
+                            tracker.Checkpoint("PersistAuditInformation");
+                        }else if (logger.IsEnabled(LogLevel.Debug))
                         {
-                            logger.LogDebug("AuditMiddleware.InvokeAsync: CommitAuditInformationAsync {0}", timeTracker.ElapsedMilliseconds);
+                            logger.LogDebug("AuditMiddleware.InvokeAsync: Skip PersistAuditInformation because IAuditService is not registered.");
+                        }
+                        if(logger.IsEnabled(LogLevel.Trace))
+                        {
+                            logger.LogTrace(tracker.ToString(true));
                         }
                     }
                     catch (Exception ex)
@@ -147,8 +128,6 @@ namespace Juice.Audit.AspNetCore.Middleware
                         logger.LogWarning(ex, $"Error while committing audit information");
                     }
                 }
-                timeTracker.Stop();
-                totalTimeTracker.Stop();
             }
 
         }
@@ -209,7 +188,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         }
 
         private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
-            HttpContext context, long elapsed, Exception? ex = default)
+            HttpContext context, ITimeTracker tracker, Exception? ex = default)
         {
             if (context.Request.HasFormContentType)
             {
@@ -235,9 +214,9 @@ namespace Juice.Audit.AspNetCore.Middleware
                     JsonConvert.SerializeObject(context.Response.Headers
                         .Where(h => _filter.IsResHeaderMatch(h.Key))
                         .ToDictionary(x => x.Key, x => x.Value)),
-                    elapsed);
-
+                        (long) tracker.ElapsedTime.TotalMilliseconds);
             });
+
             if (context.Response.StatusCode == StatusCodes.Status401Unauthorized
                 || context.Response.StatusCode == StatusCodes.Status403Forbidden)
             {

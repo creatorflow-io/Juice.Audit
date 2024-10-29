@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="Juice" Version="$(JuiceVersion)" />
+        <PackageReference Include="Juice.Measurement" Version="8.2.*" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit.Api.Contracts\Juice.Audit.Api.Contracts.csproj" />
