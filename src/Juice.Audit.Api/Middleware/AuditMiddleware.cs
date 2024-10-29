@@ -154,7 +154,10 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void InitAuditContext(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
-            var user = context.User?.FindFirst(ClaimTypes.Name)?.Value;
+            var user =
+                context.User.FindFirst("preffered_username")?.Value
+                ?? context.User.FindFirst("name")?.Value
+                ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
             var action = context.Request.Path.HasValue
                 ? context.Request.Path.Value.Trim('/').Replace("/", "_")
                 : "Unknown";
