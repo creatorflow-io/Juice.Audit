@@ -27,7 +27,7 @@
     <XUnitVersion>2.9.*</XUnitVersion>
     <TestSdk>17.11.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
-    <JuiceVersion>8.0.*$(JuiceRefSuffix)</JuiceVersion>
+    <JuiceVersion>8.1.*$(JuiceRefSuffix)</JuiceVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net9.0'">
