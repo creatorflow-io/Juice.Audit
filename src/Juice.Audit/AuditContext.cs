@@ -6,7 +6,9 @@ namespace Juice.Audit
 {
     public class AuditContext : IDisposable
     {
-        public AccessLog? AccessRecord { get; private set; }
+        public bool IsRequestedForAccess { get; private set; }
+        public bool IsRequestedForAudit => AuditEntries.Count > 0;
+        public AccessLog AccessRecord { get; private set; }
         public List<DataAudit> AuditEntries { get; private set; } = new List<DataAudit>();
 
         public AuditContext(string action, string? user)
@@ -15,19 +17,22 @@ namespace Juice.Audit
         }
 
         public void SetAction(string action)
-            => AccessRecord?.SetAction(action);
+            => AccessRecord.SetAction(action);
 
         public void SetRequestInfo(RequestInfo requestInfo)
-            => AccessRecord?.SetRequestInfo(requestInfo);
+            => AccessRecord.SetRequestInfo(requestInfo);
 
         public void SetServerInfo(ServerInfo serverInfo)
-            => AccessRecord?.SetServerInfo(serverInfo);
+            => AccessRecord.SetServerInfo(serverInfo);
 
         public void UpdateResponseInfo(Action<ResponseInfo> update)
-            => AccessRecord?.UpdateResponseInfo(update);
+            => AccessRecord.UpdateResponseInfo(update);
 
         public void AddAuditEntries(params DataAudit[] auditEntries)
             => AuditEntries.AddRange(auditEntries);
+
+        public void RequestAccessLog()
+            => IsRequestedForAccess = true;
 
         public override string ToString()
         {

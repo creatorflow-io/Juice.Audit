@@ -2,11 +2,13 @@
 {
     internal class DefaultAuditContextAccessor : IAuditContextAccessor
     {
-        public AuditContext? AuditContext { get; private set; }
+        public AuditContext AuditContext => _auditContext ?? throw new InvalidOperationException("AuditContext is not initialized. Please add the AuditMiddleware to app pipeline.");
+
+        private AuditContext? _auditContext;
 
         public void Init(string action, string? user)
         {
-            AuditContext = new AuditContext(action, user);
+            _auditContext = new AuditContext(action, user);
         }
 
 
@@ -19,8 +21,8 @@
             {
                 if (disposing)
                 {
-                    AuditContext?.Dispose();
-                    AuditContext = null;
+                    _auditContext?.Dispose();
+                    _auditContext = null;
                 }
 
                 _disposed = true;
