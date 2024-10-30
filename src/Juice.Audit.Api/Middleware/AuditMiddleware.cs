@@ -112,7 +112,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                         if (auditService != null)
                         {
                             await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
-                                auditContextAccessor.AuditContext.AuditEntries.ToArray(), default);
+                                [.. auditContextAccessor.AuditContext.AuditEntries], default);
                             tracker.Checkpoint("PersistAuditInformation");
                         }else if (logger.IsEnabled(LogLevel.Debug))
                         {
