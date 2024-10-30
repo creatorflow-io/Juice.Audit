@@ -136,7 +136,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             HttpContext context)
         {
             var user =
-                context.User.FindFirst("preffered_username")?.Value
+                context.User.FindFirst("preferred_username")?.Value
                 ?? context.User.FindFirst("name")?.Value
                 ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
             var action = context.Request.Path.HasValue
