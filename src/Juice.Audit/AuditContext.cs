@@ -34,6 +34,9 @@ namespace Juice.Audit
         public void RequestAccessLog()
             => IsRequestedForAccess = true;
 
+        public void SetUser(string? user)
+            => AccessRecord.SetUser(user);
+
         public override string ToString()
         {
             return JsonConvert.SerializeObject(this, Formatting.Indented);

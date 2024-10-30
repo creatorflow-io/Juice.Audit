@@ -18,7 +18,7 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         public Guid Id { get; set; }
         public DateTimeOffset DateTime { get; init; }
 
-        public string? User { get; init; }
+        public string? User { get; private set; }
 
         public string Action { get; private set; }
 
@@ -27,7 +27,7 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         [NotMapped]
         public string? TraceId => Request?.TraceId;
 
-        public JObject Metadata { get; private set; } = new JObject();
+        public JObject Metadata { get; private set; } = new();
 
         public RequestInfo? Request { get; private set; }
         public ServerInfo? Server { get; private set; }
@@ -67,6 +67,9 @@ namespace Juice.Audit.Domain.AccessLogAggregate
 
         public void SetAction(string action)
             => Action = action;
+
+        public void SetUser(string? user)
+            => User ??= user;
 
         public void Restricted()
         {

@@ -132,18 +132,21 @@ namespace Juice.Audit.AspNetCore.Middleware
 
         }
 
+        private string? GetUser(HttpContext context)
+        {
+            return context.User.FindFirst("preferred_username")?.Value
+                ?? context.User.FindFirst("name")?.Value
+                ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
+        }
+
         private void InitAuditContext(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
-            var user =
-                context.User.FindFirst("preferred_username")?.Value
-                ?? context.User.FindFirst("name")?.Value
-                ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
             var action = context.Request.Path.HasValue
                 ? context.Request.Path.Value.Trim('/').Replace("/", "_")
                 : "Unknown";
 
-            auditContextAccessor.Init(action, user);
+            auditContextAccessor.Init(action, GetUser(context));
             context.Response.Headers.TryAdd("X-Trace-Id", context.TraceIdentifier);
         }
 
@@ -190,6 +193,10 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context, ITimeTracker tracker, Exception? ex = default)
         {
+            if(auditContextAccessor.AuditContext.AccessRecord.User == null)
+            {
+                auditContextAccessor.AuditContext.SetUser(GetUser(context));
+            }
             if (context.Request.HasFormContentType)
             {
                 auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
