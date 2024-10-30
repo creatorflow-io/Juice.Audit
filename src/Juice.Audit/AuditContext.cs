@@ -19,6 +19,9 @@ namespace Juice.Audit
         public void SetAction(string action)
             => AccessRecord.SetAction(action);
 
+        public void SetUser(string? user)
+            => AccessRecord.SetUser(user);
+
         public void SetRequestInfo(RequestInfo requestInfo)
             => AccessRecord.SetRequestInfo(requestInfo);
 
