@@ -28,6 +28,7 @@
     <TestSdk>17.11.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
     <JuiceVersion>8.1.*$(JuiceRefSuffix)</JuiceVersion>
+    <JuiceMeasurement>8.3.1</JuiceMeasurement>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net9.0'">

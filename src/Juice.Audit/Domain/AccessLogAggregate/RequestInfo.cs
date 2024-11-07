@@ -1,4 +1,5 @@
-﻿using Juice.Domain;
+﻿using System.Text.RegularExpressions;
+using Juice.Domain;
 using Newtonsoft.Json;
 
 namespace Juice.Audit.Domain.AccessLogAggregate
@@ -45,12 +46,9 @@ namespace Juice.Audit.Domain.AccessLogAggregate
             this.ThrowIfHasErrors();
         }
 
-        public void SetData(Dictionary<string, object>? data)
-        {
-            Data = data == null ? null : JsonConvert.SerializeObject(data);
-        }
+        public void SetData(Dictionary<string, object>? data) => Data = data == null ? null : JsonConvert.SerializeObject(data);
 
         protected override IEnumerable<object> GetEqualityComponents() =>
-            new object[] { TraceId };
+            [TraceId];
     }
 }

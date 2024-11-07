@@ -4,17 +4,12 @@ using Newtonsoft.Json;
 
 namespace Juice.Audit
 {
-    public class AuditContext : IDisposable
+    public class AuditContext(string action, string? user) : IDisposable
     {
         public bool IsRequestedForAccess { get; private set; }
         public bool IsRequestedForAudit => AuditEntries.Count > 0;
-        public AccessLog AccessRecord { get; private set; }
+        public AccessLog AccessRecord { get; private set; } = new AccessLog(action, user);
         public List<DataAudit> AuditEntries { get; private set; } = [];
-
-        public AuditContext(string action, string? user)
-        {
-            AccessRecord = new AccessLog(action, user);
-        }
 
         public void SetAction(string action)
             => AccessRecord.SetAction(action);
