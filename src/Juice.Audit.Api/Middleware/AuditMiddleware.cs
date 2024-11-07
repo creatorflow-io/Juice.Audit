@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -174,9 +175,16 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void CollectRequestInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
+
+            // remove the id (int or guid) from the path
+            var path = context.Request.Path.HasValue
+                ? context.Request.Path.Value : "";
+            path = Regex.Replace(path, @"\/[a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12}", "/{id}", RegexOptions.IgnoreCase);
+            path = Regex.Replace(path, @"\/[0-9]+", "/{id}", RegexOptions.IgnoreCase);
+
             var requestInfo = new RequestInfo(
                 context.Request.Method,
-                context.Request.Path,
+                path,
                 default,
                 context.Request.QueryString.HasValue ? context.Request.QueryString.Value : default,
                 JsonConvert.SerializeObject(context.Request.Headers

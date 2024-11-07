@@ -1,4 +1,6 @@
-﻿using FluentAssertions;
+﻿using System.IO;
+using System.Text.RegularExpressions;
+using FluentAssertions;
 using Juice.Audit.AspNetCore.Middleware;
 using Xunit.Abstractions;
 
