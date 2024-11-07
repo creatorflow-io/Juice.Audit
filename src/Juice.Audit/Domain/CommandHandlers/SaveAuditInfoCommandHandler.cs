@@ -1,7 +1,6 @@
 ﻿using Juice.Audit.Commands;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
-using Juice.Domain;
 using MediatR;
 
 namespace Juice.Audit.CommandHandlers
@@ -21,7 +20,7 @@ namespace Juice.Audit.CommandHandlers
         {
             try
             {
-                if (request.DataAuditEntries?.Any() ?? false)
+                if (request.DataAuditEntries.Length > 0)
                 {
                     await _auditRepository.AddRangeAsync(request.DataAuditEntries, cancellationToken);
                 }

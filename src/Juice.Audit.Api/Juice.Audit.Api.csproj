@@ -18,6 +18,6 @@
 
     <ItemGroup>
         <PackageReference Include="Grpc.AspNetCore.Server" Version="$(GrpcVersion)" />
-        <PackageReference Include="Juice.Measurement" Version="8.2.*" />
+        <PackageReference Include="Juice.Measurement.Stores" Version="$(JuiceMeasurement)" />
     </ItemGroup>
 </Project>

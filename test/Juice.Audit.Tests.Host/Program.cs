@@ -4,6 +4,7 @@ using Juice.Audit.AspNetCore.Middleware;
 using Juice.Audit.EF;
 using Juice.Domain.Events;
 using Juice.EF.Extensions;
+using Juice.Measurement.Stores.EF;
 using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,11 @@ builder.Services.ConfigureAuditDefault(builder.Configuration, options =>
     //options.DatabaseProvider = "PostgreSQL";
 });
 
+builder.Services.AddExecutionTimeMeasurement();
+builder.Services.AddMeasurementEFStores(builder.Configuration, options =>
+{
+    //options.DatabaseProvider = "SqlServer";
+});
 
 builder.Services.AddMediatR(options => { options.RegisterServicesFromAssemblyContaining<Program>(); });
 
@@ -59,10 +65,10 @@ app.MapGet("/", async (ctx) =>
     await ctx.Response.WriteAsync(auditContext.AccessRecord.Server?.App ?? "");
 });
 
-app.MapGet("/audit", async (ctx) =>
+app.MapGet("/request_audit", async (ctx) =>
 {
     var mediator = ctx.RequestServices.GetRequiredService<IMediator>();
-    await mediator.Publish(new DataEvent("Inserted")
+    await mediator.Publish(new AuditEvent("Inserted")
         .SetAuditRecord(new AuditRecord("test")
         {
             User = "test",
@@ -81,7 +87,7 @@ app.MapGet("/audit", async (ctx) =>
             }
         }));
 
-    await mediator.Publish(new DataEvent("Inserted")
+    await mediator.Publish(new AuditEvent("Inserted")
             .SetAuditRecord(new AuditRecord("test1")
             {
                 User = "test",
@@ -99,16 +105,24 @@ app.MapGet("/audit", async (ctx) =>
                 {
                 }
             }));
-});
-
-
-app.MapGet("/cancel", async (ctx) =>
-{
-    await Task.Delay(TimeSpan.FromMinutes(1));
     ctx.Response.StatusCode = 200;
     await ctx.Response.WriteAsync("ok");
 });
 
+app.MapGet("/time_exceeded", async (ctx) =>
+{
+    await Task.Delay(TimeSpan.FromSeconds(3));
+    ctx.Response.StatusCode = 200;
+    await ctx.Response.WriteAsync("ok");
+});
+
+app.MapGet("/request_accesslog", async (ctx) =>
+{
+    var auditContext = ctx.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext;
+    auditContext.RequestAccessLog();
+    ctx.Response.StatusCode = 200;
+    await ctx.Response.WriteAsync("ok");
+});
 
 
 app.MapGet("/err/403", async (ctx) =>
@@ -118,7 +132,7 @@ app.MapGet("/err/403", async (ctx) =>
 });
 
 // Use with ConfigureAuditDefault together
-await MigrateAsync(app);
+//await MigrateAsync(app);
 
 app.Run();
 
@@ -127,4 +141,8 @@ async Task MigrateAsync(WebApplication app)
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
     await db.MigrateAsync();
+    var db1 = scope.ServiceProvider.GetRequiredService<MeasurementDbContext>();
+    await db1.MigrateAsync();
 }
+
+public partial class Program { }

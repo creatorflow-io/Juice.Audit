@@ -17,7 +17,7 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddScoped(p =>
             {
-                var options = new DbOptions<AuditDbContext> { DatabaseProvider = "SqlServer" };
+                var options = new DbOptions<AuditDbContext> { DatabaseProvider = "SqlServer", Schema = "Audit" };
                 configureOptions?.Invoke(options);
                 return options;
             });

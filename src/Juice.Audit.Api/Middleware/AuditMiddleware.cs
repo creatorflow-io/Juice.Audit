@@ -1,9 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
+using Juice.Audit.Api.Extensions;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Measurement;
 using Juice.Measurement.Internal;
+using Juice.Measurement.Stores;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -52,38 +55,43 @@ namespace Juice.Audit.AspNetCore.Middleware
             }
 
             bool isMatch = false;
+            bool isTimeExceeded = false;
             try
             {
-                await _next(context);
-                tracker.Checkpoint("Next");
+                using (tracker.BeginScope("Invoke"))
+                {
+                    await _next(context);
+                }
+
 
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
                     : context.Response.StatusCode;
+                isTimeExceeded = tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
 
                 isMatch = auditContextAccessor.AuditContext.IsRequestedForAccess
                     || auditContextAccessor.AuditContext.IsRequestedForAudit
-                    || tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold
+                    || isTimeExceeded
                     || _filter.IsMatch(context.Request.Path, context.Request.Method, status);
-                if (isMatch)
-                {
-                    try
-                    {
-                        PostRequestColllectInfo(auditContextAccessor, context, tracker);
 
-                        tracker.Checkpoint("PostRequestColllectInfo");
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Error while collecting the response information");
-                    }
-                }
-                else
+                if (!isMatch && !isTimeExceeded)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because response status does not match");
                     }
+                    return;
+                }
+
+                try
+                {
+                    PostRequestColllectInfo(auditContextAccessor, context, tracker);
+
+                    tracker.Checkpoint("PostRequestColllectInfo");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Error while collecting the response information");
                 }
             }
             catch (Exception ex)
@@ -106,26 +114,46 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     try
                     {
+                        using var _ = tracker.BeginScope("SaveAuditData");
                         var auditService = context.RequestServices.GetService<IAuditService>();
                         tracker.Checkpoint("GetAuditService");
-                        
+
                         if (auditService != null)
                         {
                             await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
                                 [.. auditContextAccessor.AuditContext.AuditEntries], default);
-                            tracker.Checkpoint("PersistAuditInformation");
-                        }else if (logger.IsEnabled(LogLevel.Debug))
+                            tracker.Checkpoint("Persist");
+                        }
+                        else if (logger.IsEnabled(LogLevel.Debug))
                         {
                             logger.LogDebug("AuditMiddleware.InvokeAsync: Skip PersistAuditInformation because IAuditService is not registered.");
                         }
-                        if(logger.IsEnabled(LogLevel.Trace))
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, $"Error while saving audit information");
+                    }
+                }
+
+                if (isTimeExceeded)
+                {
+                    try
+                    {
+                        using var _ = tracker.BeginScope("SaveTrackData");
+                        var timeRepository = context.RequestServices.GetService<ITimeRepository>();
+                        _.Dispose();
+                        if (timeRepository != null)
+                        {
+                            await timeRepository.SaveTrackDataAsync(tracker, context.TraceIdentifier, auditContextAccessor.AuditContext.AccessRecord.Action, "Invoke");
+                        }
+                        if (logger.IsEnabled(LogLevel.Trace))
                         {
                             logger.LogTrace(tracker.ToString(true));
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, $"Error while committing audit information");
+                        logger.LogWarning(ex, "Error while saving execution time trace data");
                     }
                 }
             }
@@ -142,8 +170,10 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void InitAuditContext(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
-            var action = context.Request.Path.HasValue
-                ? context.Request.Path.Value.Trim('/').Replace("/", "_")
+            var (path, id) = context.Request.Path.GetPathComponents();
+
+            var action = path != string.Empty
+                ? path.Trim('/').Replace("/", "_")
                 : "Unknown";
 
             auditContextAccessor.Init(action, GetUser(context));
@@ -153,6 +183,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void CollectRequestInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
+
             var requestInfo = new RequestInfo(
                 context.Request.Method,
                 context.Request.Path,
@@ -166,7 +197,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 context.TraceIdentifier,
                 context.Request.Host.HasValue ? context.Request.Host.Value : default
                 )
-           ;
+            ;
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
         }
 
@@ -193,7 +224,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context, ITimeTracker tracker, Exception? ex = default)
         {
-            if(auditContextAccessor.AuditContext.AccessRecord.User == null)
+            if (auditContextAccessor.AuditContext.AccessRecord.User == null)
             {
                 auditContextAccessor.AuditContext.SetUser(GetUser(context));
             }
@@ -221,7 +252,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     JsonConvert.SerializeObject(context.Response.Headers
                         .Where(h => _filter.IsResHeaderMatch(h.Key))
                         .ToDictionary(x => x.Key, x => x.Value)),
-                        (long) tracker.ElapsedTime.TotalMilliseconds);
+                        (long)tracker.ElapsedTime.TotalMilliseconds);
             });
 
             if (context.Response.StatusCode == StatusCodes.Status401Unauthorized
