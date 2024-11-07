@@ -1,5 +1,7 @@
 ﻿using FluentAssertions;
+using Juice.Audit.Api.Extensions;
 using Juice.Audit.AspNetCore.Middleware;
+using Microsoft.AspNetCore.Http;
 using Xunit.Abstractions;
 
 namespace Juice.Audit.Tests
@@ -183,5 +185,29 @@ namespace Juice.Audit.Tests
             options.IsReqHeaderMatch(":authority:").Should().BeTrue();
         }
 
+
+        [Fact(DisplayName = "Filter should be replaced")]
+        public void Path_should_replaced()
+        {
+            var path = new PathString("/kernel/info/1");
+            var (p, id) = path.GetPathComponents();
+            p.Should().Be("/kernel/info/{id}");
+            id.Should().Be("1");
+
+            path = new PathString("/kernel/info/1/action");
+            (p, id) = path.GetPathComponents();
+            p.Should().Be("/kernel/info/{id}/action");
+            id.Should().Be("1");
+
+            path = new PathString("/kernel/info/" + Guid.NewGuid());
+            (p, id) = path.GetPathComponents();
+            p.Should().Be("/kernel/info/{id}");
+            id.Should().NotBeNull();
+
+            path = new PathString("/kernel/info/" + Guid.NewGuid() + "/action");
+            (p, id) = path.GetPathComponents();
+            p.Should().Be("/kernel/info/{id}/action");
+            id.Should().NotBeNull();
+        }
     }
 }
