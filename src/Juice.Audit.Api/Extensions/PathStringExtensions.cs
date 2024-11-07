@@ -24,11 +24,11 @@ namespace Juice.Audit.Api.Extensions
             {
                 if (Guid.TryParse(p, out var guid))
                 {
-                    return (path.Value.Replace($"/{p}", ""), p);
+                    return (path.Value.Replace($"/{p}", "/{id}"), p);
                 }
                 if (long.TryParse(p, out var number))
                 {
-                    return (path.Value.Replace($"/{p}", ""), p);
+                    return (path.Value.Replace($"/{p}", "/{id}"), p);
                 }
             }
             return (path.Value, null);
