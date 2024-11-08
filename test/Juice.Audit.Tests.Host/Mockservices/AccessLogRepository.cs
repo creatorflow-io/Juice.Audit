@@ -12,7 +12,7 @@ namespace Juice.Audit.Tests.Host.Mockservices
             _logger = logger;
         }
 
-        public IUnitOfWork UnitOfWork => throw new NotImplementedException();
+        public IUnitOfWork<AccessLog> UnitOfWork => throw new NotImplementedException();
 
         public Task<IOperationResult<AccessLog>> AddAsync(AccessLog entity, CancellationToken token)
         {

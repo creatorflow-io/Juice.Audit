@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
 using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Juice.Audit.Api.Extensions;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Measurement;
@@ -46,8 +45,7 @@ namespace Juice.Audit.AspNetCore.Middleware
 
             try
             {
-                PreRequestCollectInfo(auditContextAccessor, context);
-                tracker.Checkpoint("PreRequestCollectInfo");
+                PreRequestCollectInfo(auditContextAccessor, tracker, context);
             }
             catch (Exception ex)
             {
@@ -86,8 +84,6 @@ namespace Juice.Audit.AspNetCore.Middleware
                 try
                 {
                     PostRequestColllectInfo(auditContextAccessor, context, tracker);
-
-                    tracker.Checkpoint("PostRequestColllectInfo");
                 }
                 catch (Exception ex)
                 {
@@ -100,7 +96,6 @@ namespace Juice.Audit.AspNetCore.Middleware
                 try
                 {
                     PostRequestColllectInfo(auditContextAccessor, context, tracker, ex);
-                    tracker.Checkpoint("PostRequestColllectInfo exception");
                 }
                 catch (Exception ex1)
                 {
@@ -195,7 +190,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 context.Request.Scheme,
                 context.Connection.RemoteIpAddress?.ToString(),
                 context.TraceIdentifier,
-                context.Request.Host.HasValue ? context.Request.Host.Value : default
+                context.Request.Host.ToString()
                 )
             ;
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
@@ -215,22 +210,29 @@ namespace Juice.Audit.AspNetCore.Middleware
         }
 
         private void PreRequestCollectInfo(IAuditContextAccessor auditContextAccessor,
+            ITimeTracker tracker,
             HttpContext context)
         {
+            using var _ = tracker.BeginScope("PreRequestCollectInfo");
             CollectRequestInfo(auditContextAccessor, context);
+            tracker.Checkpoint("CollectRequestInfo");
             CollectServerInfo(auditContextAccessor);
+            tracker.Checkpoint("CollectServerInfo");
         }
 
         private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
             HttpContext context, ITimeTracker tracker, Exception? ex = default)
         {
+            using var _ = tracker.BeginScope("PostRequestColllectInfo");
             if (auditContextAccessor.AuditContext.AccessRecord.User == null)
             {
                 auditContextAccessor.AuditContext.SetUser(GetUser(context));
+                tracker.Checkpoint("SetUser");
             }
             if (context.Request.HasFormContentType)
             {
                 auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
+                tracker.Checkpoint("SetFormData");
             }
             auditContextAccessor.AuditContext.UpdateResponseInfo(responseInfo =>
             {
@@ -254,11 +256,12 @@ namespace Juice.Audit.AspNetCore.Middleware
                         .ToDictionary(x => x.Key, x => x.Value)),
                         (long)tracker.ElapsedTime.TotalMilliseconds);
             });
-
+            tracker.Checkpoint("UpdateResponseInfo");
             if (context.Response.StatusCode == StatusCodes.Status401Unauthorized
                 || context.Response.StatusCode == StatusCodes.Status403Forbidden)
             {
                 auditContextAccessor.AuditContext.AccessRecord.Restricted();
+                tracker.Checkpoint("Restricted");
             }
         }
 
