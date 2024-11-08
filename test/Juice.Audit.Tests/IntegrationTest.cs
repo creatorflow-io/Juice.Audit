@@ -97,7 +97,7 @@ namespace Juice.Audit.Tests
             var time = await timeRepo.GetTimeSummaryAsync(traceId!);
             time.Should().BeNull();
 
-            var auditEntries = await dataAuditRepo.UnitOfWork.Query<DataAudit>()
+            var auditEntries = await dataAuditRepo.UnitOfWork.Query()
                 .Where(a => a.TraceId == traceId).ToListAsync();
             auditEntries.Should().HaveCount(2);
         }
