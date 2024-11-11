@@ -49,6 +49,7 @@ builder.Configuration.Bind("Audit", configs);
 
 app.UseAudit("XUnitTest", options =>
 {
+    options.ExecutionTimeThreshold = 1000;
     options.Include(string.Empty, "POST", "PUT", "DELETE");
     options.Include("/audit", "GET");
     options.Exclude("/Index");
