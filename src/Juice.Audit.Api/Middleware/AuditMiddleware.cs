@@ -37,6 +37,10 @@ namespace Juice.Audit.AspNetCore.Middleware
             {
                 InitAuditContext(auditContextAccessor, context);
                 tracker.Checkpoint("InitAuditContext");
+                if(logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug("Version: {0}", auditContextAccessor.AuditContext.Version);
+                }
             }
             catch (Exception ex)
             {
@@ -76,7 +80,8 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
-                        logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because response status does not match");
+                        logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because the conditions do not match. Status: {0}; AccessLog requested: {1}; DataAudit requested: {2}; TimeExceeded: {3}",
+                            status, auditContextAccessor.AuditContext.IsRequestedForAccess, auditContextAccessor.AuditContext.IsRequestedForAudit, isTimeExceeded);
                     }
                     return;
                 }
