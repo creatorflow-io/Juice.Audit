@@ -65,7 +65,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
                     : context.Response.StatusCode;
-                isTimeExceeded = tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
+                isTimeExceeded = _filter.ExecutionTimeThreshold.HasValue && tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
 
                 isMatch = auditContextAccessor.AuditContext.IsRequestedForAccess
                     || auditContextAccessor.AuditContext.IsRequestedForAudit

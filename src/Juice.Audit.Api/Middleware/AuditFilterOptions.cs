@@ -2,7 +2,7 @@
 {
     public class AuditFilterOptions
     {
-        public int ExecutionTimeThreshold { get; set; } = 1000;
+        public int? ExecutionTimeThreshold { get; set; }
         public int RequestAbortedStatusCode { get; set; } = 408;
         public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();
 
@@ -88,7 +88,7 @@
             => IsMatch(path, method, out var _);
         public bool IsMatch(string path, string method, out string? rule)
         {
-            if (Filters.Length == 0 || Filters.Any(f => f.StatusCodes.Any()))
+            if (Filters.Length == 0 || Filters.Any(f => f.StatusCodes.Length != 0) || ExecutionTimeThreshold.HasValue)
             {
                 rule = null;
                 return true;
