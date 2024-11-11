@@ -8,6 +8,7 @@ namespace Juice.Audit
     {
         public bool IsRequestedForAccess { get; private set; }
         public bool IsRequestedForAudit => AuditEntries.Count > 0;
+        public Version? Version => GetType().Assembly.GetName().Version;
         public AccessLog AccessRecord { get; private set; }
         public List<DataAudit> AuditEntries { get; private set; } = new List<DataAudit>();
 

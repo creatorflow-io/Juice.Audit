@@ -99,7 +99,8 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     if (dbg)
                     {
-                        logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because response status does not match");
+                        logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because response status does not match. AccessLog requested: {0}; DataAudit requested: {1}",
+                            auditContextAccessor.AuditContext.IsRequestedForAccess, auditContextAccessor.AuditContext.IsRequestedForAudit);
                     }
                 }
             }
