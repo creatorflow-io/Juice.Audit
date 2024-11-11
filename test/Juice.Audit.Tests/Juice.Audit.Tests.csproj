@@ -25,8 +25,11 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Juice.Audit.Api\Juice.Audit.Api.csproj" />
+        <ProjectReference Include="..\Juice.Audit.Tests.Host\Juice.Audit.Tests.Host.csproj" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Juice.XUnit" Version="$(JuiceVersion)" />
+        <PackageReference Label="Integration tests" Include="Microsoft.AspNetCore.Mvc.Testing" Condition="'$(TargetFramework)' == 'net6.0'" Version="6.*" />
+        <PackageReference Label="Integration tests" Include="Microsoft.AspNetCore.Mvc.Testing" Condition="'$(TargetFramework)' == 'net8.0'" Version="8.*" />
     </ItemGroup>
 </Project>

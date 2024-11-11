@@ -59,10 +59,10 @@ app.MapGet("/", async (ctx) =>
     await ctx.Response.WriteAsync(auditContext.AccessRecord.Server?.App ?? "");
 });
 
-app.MapGet("/audit", async (ctx) =>
+app.MapGet("/request_audit", async (ctx) =>
 {
     var mediator = ctx.RequestServices.GetRequiredService<IMediator>();
-    await mediator.Publish(new DataEvent("Inserted")
+    await mediator.Publish(new AuditEvent("Inserted")
         .SetAuditRecord(new AuditRecord("test")
         {
             User = "test",
@@ -81,7 +81,7 @@ app.MapGet("/audit", async (ctx) =>
             }
         }));
 
-    await mediator.Publish(new DataEvent("Inserted")
+    await mediator.Publish(new AuditEvent("Inserted")
             .SetAuditRecord(new AuditRecord("test1")
             {
                 User = "test",
@@ -99,6 +99,15 @@ app.MapGet("/audit", async (ctx) =>
                 {
                 }
             }));
+    await ctx.Response.WriteAsync("ok");
+});
+
+app.MapGet("/request_accesslog", async (ctx) =>
+{
+    var auditContext = ctx.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext;
+    auditContext.RequestAccessLog();
+    ctx.Response.StatusCode = 200;
+    await ctx.Response.WriteAsync("ok");
 });
 
 
@@ -128,3 +137,5 @@ async Task MigrateAsync(WebApplication app)
     var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
     await db.MigrateAsync();
 }
+
+public partial class Program { }

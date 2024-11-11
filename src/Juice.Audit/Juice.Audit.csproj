@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="Juice" Version="$(JuiceVersion)" />
+        <InternalsVisibleTo Include="Juice.Audit.Tests"/>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit.Api.Contracts\Juice.Audit.Api.Contracts.csproj" />

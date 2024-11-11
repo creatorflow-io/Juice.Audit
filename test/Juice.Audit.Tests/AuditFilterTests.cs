@@ -2,6 +2,7 @@
 using System.Text.RegularExpressions;
 using FluentAssertions;
 using Juice.Audit.AspNetCore.Middleware;
+using Juice.Audit.Services;
 using Xunit.Abstractions;
 
 namespace Juice.Audit.Tests
@@ -185,5 +186,14 @@ namespace Juice.Audit.Tests
             options.IsReqHeaderMatch(":authority:").Should().BeTrue();
         }
 
+
+        [Fact]
+        public void Should_request_accessLog()
+        {
+            var accessor = new DefaultAuditContextAccessor();
+            accessor.Init("xunit", default);
+            accessor.AuditContext.RequestAccessLog();
+            accessor.AuditContext.IsRequestedForAccess.Should().BeTrue();
+        }
     }
 }
