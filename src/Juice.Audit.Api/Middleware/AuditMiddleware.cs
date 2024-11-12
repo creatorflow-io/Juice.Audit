@@ -136,8 +136,12 @@ namespace Juice.Audit.AspNetCore.Middleware
                         }
                         if (auditService != null)
                         {
-                            await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
+                            var rs = await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
                                 auditContextAccessor.AuditContext.AuditEntries.ToArray(), default);
+                            if(!rs.Succeeded)
+                            {
+                                logger.LogWarning("Error while persisting audit information: {0}", rs.ToString());
+                            }
                         }
                         if (dbg)
                         {
