@@ -39,6 +39,7 @@ builder.Services.AddMediatR(options => { options.RegisterServicesFromAssemblyCon
 //});
 
 builder.Services.AddRazorPages();
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
@@ -59,8 +60,9 @@ app.UseAudit("XUnitTest", options =>
 });
 
 app.MapRazorPages();
+app.MapDefaultControllerRoute();
 
-app.MapGet("/", async (ctx) =>
+app.MapGet("/app", async (ctx) =>
 {
     var auditContext = ctx.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext;
     await ctx.Response.WriteAsync(auditContext.AccessRecord.Server?.App ?? "");

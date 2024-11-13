@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System.Net;
+using System.Reflection;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
 using Newtonsoft.Json;
@@ -7,11 +8,25 @@ namespace Juice.Audit
 {
     public class AuditContext(string action, string? user) : IDisposable
     {
-        public bool IsRequestedForAccess { get; private set; }
-        public bool IsRequestedForAudit => AuditEntries.Count > 0;
+        public bool IsRequestedForMeasureLog(TimeSpan elapsed)
+            => _requestMeasureLog && (!_requestMeasureLogThreshold.HasValue || elapsed >= _requestMeasureLogThreshold);
+        private bool _requestMeasureLog;
+        private TimeSpan? _requestMeasureLogThreshold;
+
+        public bool IsRequestedForAccessLog(int statusCode)
+            => _requestAccessLog && (_requestAccessLogHttpStatusCodes.Length == 0 || _requestAccessLogHttpStatusCodes.Contains(statusCode));
+        private bool _requestAccessLog;
+        private int[] _requestAccessLogHttpStatusCodes = [];
+
+        public bool IsRequestedForAuditLog => AuditEntries.Count > 0;
         public Version? Version => Assembly.GetEntryAssembly()?.GetName().Version;
         public AccessLog AccessRecord { get; private set; } = new AccessLog(action, user);
         public List<DataAudit> AuditEntries { get; private set; } = [];
+
+        /// <summary>
+        /// Shared data between different parts of the application
+        /// </summary>
+        public Dictionary<string, object?> Items { get; private set; } = [];
 
         public void SetAction(string action)
             => AccessRecord.SetAction(action);
@@ -28,8 +43,17 @@ namespace Juice.Audit
         public void AddAuditEntries(params DataAudit[] auditEntries)
             => AuditEntries.AddRange(auditEntries);
 
-        public void RequestAccessLog()
-            => IsRequestedForAccess = true;
+        public void RequestAccessLog(params int[] statusCodes)
+        {
+            _requestAccessLog = true;
+            _requestAccessLogHttpStatusCodes = statusCodes;
+        }
+
+        public void RequestMeasureLog(TimeSpan? threshold)
+        {
+            _requestMeasureLogThreshold = threshold;
+            _requestMeasureLog = true;
+        }
 
         public void SetUser(string? user)
             => AccessRecord.SetUser(user);
@@ -48,8 +72,9 @@ namespace Juice.Audit
                 if (disposing)
                 {
                     // dispose managed state (managed objects).
-                    AccessRecord = null;
-                    AuditEntries = null!;
+                    AuditEntries.Clear();
+                    Items.Clear();
+                    _requestAccessLogHttpStatusCodes = [];
                 }
                 _disposed = true;
             }

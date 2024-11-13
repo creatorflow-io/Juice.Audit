@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFrameworks>$(AppTargetFramework)</TargetFrameworks>
@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Juice.Audit.Api\Juice.Audit.Api.csproj" />
+        <ProjectReference Include="..\..\src\Juice.Audit.AspNetCore\Juice.Audit.AspNetCore.csproj" />
         <ProjectReference Include="..\..\src\Juice.Audit.EF.PostgreSQL\Juice.Audit.EF.PostgreSQL.csproj" />
         <ProjectReference Include="..\..\src\Juice.Audit.EF.SqlServer\Juice.Audit.EF.SqlServer.csproj" />
         <ProjectReference Include="..\..\src\Juice.Audit.EF\Juice.Audit.EF.csproj" />

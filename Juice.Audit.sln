@@ -45,6 +45,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{124B
 		.github\workflows\nuget-release.yml = .github\workflows\nuget-release.yml
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Juice.Audit.AspNetCore", "src\Juice.Audit.AspNetCore\Juice.Audit.AspNetCore.csproj", "{9F68C4BB-3715-4AD9-A067-D00A907F9780}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +89,10 @@ Global
 		{2F89A75B-766C-4F4E-8D9B-2A750CF8CED2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2F89A75B-766C-4F4E-8D9B-2A750CF8CED2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2F89A75B-766C-4F4E-8D9B-2A750CF8CED2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F68C4BB-3715-4AD9-A067-D00A907F9780}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F68C4BB-3715-4AD9-A067-D00A907F9780}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F68C4BB-3715-4AD9-A067-D00A907F9780}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F68C4BB-3715-4AD9-A067-D00A907F9780}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -102,6 +108,7 @@ Global
 		{A96578A1-16D1-451C-A9A3-6C531B3708C8} = {E08E9A08-C892-4DD7-885E-C554F76CBB2C}
 		{2F89A75B-766C-4F4E-8D9B-2A750CF8CED2} = {E08E9A08-C892-4DD7-885E-C554F76CBB2C}
 		{124B686E-C799-48EF-8194-EAAD401B9B7C} = {3AEBE936-EF22-472A-9006-F63D1D833C88}
+		{9F68C4BB-3715-4AD9-A067-D00A907F9780} = {236CB6C7-BBEC-466E-AF03-BBEE6E9CDAB3}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {460941A3-8218-4F89-9297-12A89EE9B95A}
