@@ -32,16 +32,17 @@
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net9.0'">
-    <MicrosoftExtensionsVersion>9.0.*-rc.*</MicrosoftExtensionsVersion>
+    <MicrosoftExtensionsVersion>9.0.0-rc.2</MicrosoftExtensionsVersion>
+    <NpgsqlVersion>9.0.0-rc.2</NpgsqlVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net8.0'">
     <MicrosoftExtensionsVersion>8.0.*</MicrosoftExtensionsVersion>
+    <NpgsqlVersion>$(MicrosoftExtensionsVersion)</NpgsqlVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning">
     <EFVersion>$(MicrosoftExtensionsVersion)</EFVersion>
-    <NpgsqlVersion>$(MicrosoftExtensionsVersion)</NpgsqlVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Build">

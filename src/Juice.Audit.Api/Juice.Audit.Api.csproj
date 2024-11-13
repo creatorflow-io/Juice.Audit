@@ -7,10 +7,6 @@
         <Description>Provides API to work on Audit service</Description>
     </PropertyGroup>
 
-    <ItemGroup Label="AspNetCore">
-        <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    </ItemGroup>
-
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit.Api.Contracts\Juice.Audit.Api.Contracts.csproj" />
         <ProjectReference Include="..\Juice.Audit.EF\Juice.Audit.EF.csproj" />

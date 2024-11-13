@@ -69,10 +69,12 @@ namespace Juice.Audit.AspNetCore.Middleware
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
                     : context.Response.StatusCode;
-                isTimeExceeded = _filter.ExecutionTimeThreshold.HasValue && tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
+                isTimeExceeded =
+                    auditContextAccessor.AuditContext.IsRequestedForMeasureLog(tracker.ElapsedTime)
+                    || _filter.ExecutionTimeThreshold.HasValue && tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
 
-                isMatch = auditContextAccessor.AuditContext.IsRequestedForAccess
-                    || auditContextAccessor.AuditContext.IsRequestedForAudit
+                isMatch = auditContextAccessor.AuditContext.IsRequestedForAccessLog(status)
+                    || auditContextAccessor.AuditContext.IsRequestedForAuditLog
                     || isTimeExceeded
                     || _filter.IsMatch(context.Request.Path, context.Request.Method, status);
 
@@ -81,7 +83,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     if (logger.IsEnabled(LogLevel.Debug))
                     {
                         logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because the conditions do not match. Status: {0}; AccessLog requested: {1}; DataAudit requested: {2}; TimeExceeded: {3}",
-                            status, auditContextAccessor.AuditContext.IsRequestedForAccess, auditContextAccessor.AuditContext.IsRequestedForAudit, isTimeExceeded);
+                            status, auditContextAccessor.AuditContext.IsRequestedForAccessLog(status), auditContextAccessor.AuditContext.IsRequestedForAuditLog, isTimeExceeded);
                     }
                     return;
                 }
@@ -120,8 +122,16 @@ namespace Juice.Audit.AspNetCore.Middleware
 
                         if (auditService != null)
                         {
-                            await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
+                            var rs = await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
                                 [.. auditContextAccessor.AuditContext.AuditEntries], default);
+                            if (!rs.Succeeded)
+                            {
+                                logger.LogWarning("Error while saving audit information. {0}", rs.ToString());
+                                if (logger.IsEnabled(LogLevel.Trace))
+                                {
+                                    logger.LogTrace(rs.StackTrace);
+                                }
+                            }
                             tracker.Checkpoint("Persist");
                         }
                         else if (logger.IsEnabled(LogLevel.Debug))
@@ -144,7 +154,9 @@ namespace Juice.Audit.AspNetCore.Middleware
                         _.Dispose();
                         if (timeRepository != null)
                         {
-                            await timeRepository.SaveTrackDataAsync(tracker, context.TraceIdentifier, auditContextAccessor.AuditContext.AccessRecord.Action, "Invoke");
+                            await timeRepository.SaveTrackDataAsync(tracker, context.TraceIdentifier,
+                                auditContextAccessor.AuditContext.AccessRecord.Action,
+                                auditContextAccessor.AuditContext.AccessRecord.Action);
                         }
                         if (logger.IsEnabled(LogLevel.Trace))
                         {

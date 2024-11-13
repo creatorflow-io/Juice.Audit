@@ -27,7 +27,7 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         [NotMapped]
         public string? TraceId => Request?.TraceId;
 
-        public JObject Metadata { get; private set; } = new();
+        public JObject Metadata { get; private set; } = [];
 
         public RequestInfo? Request { get; private set; }
         public ServerInfo? Server { get; private set; }
