@@ -1,5 +1,4 @@
-﻿using System.Text.RegularExpressions;
-using Juice.Domain;
+﻿using Juice.Domain;
 using Newtonsoft.Json;
 
 namespace Juice.Audit.Domain.AccessLogAggregate

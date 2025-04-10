@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using Xunit.Abstractions;
 
 namespace Juice.Audit.Tests
@@ -36,6 +37,43 @@ namespace Juice.Audit.Tests
             var accessLog = await accessLogRepo.FindAsync(l => l.Request.TraceId == traceId!);
 #pragma warning restore CS8602 // Dereference of a possibly null reference.
             accessLog.Should().NotBeNull();
+
+            var time = await timeRepo.GetTimeSummaryAsync(traceId!);
+            time.Should().BeNull();
+
+        }
+
+        [IgnoreOnCIFact(DisplayName = "Should request log for route")]
+        public async Task Should_request_log_routeAsync()
+        {
+            int id = Math.Abs(Guid.NewGuid().GetHashCode());
+            var url = $"/api/{id}/status";
+            output.WriteLine(url);
+
+            var client = factory.CreateClient();
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var responseString = await response.Content.ReadAsStringAsync();
+            responseString.Should().Be(id.ToString());
+
+            var traceId = response.Headers.GetValues("X-Trace-Id").FirstOrDefault();
+            traceId.Should().NotBeNullOrEmpty();
+
+            using var scope = factory.Services.CreateScope();
+            var timeRepo = scope.ServiceProvider.GetRequiredService<ITimeRepository>();
+            var accessLogRepo = scope.ServiceProvider.GetRequiredService<IAccessLogRepository>();
+
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
+            var accessLog = await accessLogRepo.FindAsync(l => l.Request.TraceId == traceId!);
+#pragma warning restore CS8602 // Dereference of a possibly null reference.
+            accessLog.Should().NotBeNull();
+            accessLog!.Action.Should().Be("api_{id}_status");
+            accessLog.Request?.Data.Should().NotBeNullOrEmpty();
+
+            var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(accessLog.Request!.Data!)??[];
+            data.Should().ContainKey("id");
+            data["id"].Should().Be(id.ToString());
 
             var time = await timeRepo.GetTimeSummaryAsync(traceId!);
             time.Should().BeNull();

@@ -18,12 +18,16 @@ namespace Juice.Audit.AspNetCore.Middleware
         private RequestDelegate _next;
         private string _appName;
         private AuditFilterOptions _filter;
+        private string? _action;
+        private IDictionary<string, string>? _routeValues;
 
-        public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options)
+        public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options, string action, IDictionary<string, string> routeValues)
         {
             _next = next;
             _appName = appName;
             _filter = options;
+            _routeValues = routeValues;
+            _action = action;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -76,8 +80,8 @@ namespace Juice.Audit.AspNetCore.Middleware
                 isMatch = auditContextAccessor.AuditContext.IsRequestedForAccessLog(status)
                     || auditContextAccessor.AuditContext.IsRequestedForAuditLog
                     || isTimeExceeded
-                    || _filter.IsMatch(context.Request.Path, context.Request.Method, status);
-
+                    || _filter.IsMatch(context.Request.Path, context.Request.Method, status, out _, out _action, out _routeValues);
+                
                 if (!isMatch && !isTimeExceeded)
                 {
                     if (logger.IsEnabled(LogLevel.Debug))
@@ -184,9 +188,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             var (path, id) = context.Request.Path.GetPathComponents();
 
-            var action = path != string.Empty
-                ? path.Trim('/').Replace("/", "_")
-                : "Unknown";
+            var action = _action ?? StringUtils.PathToAction(path) ?? "Unknown";
 
             auditContextAccessor.Init(action, GetUser(context));
             context.Response.Headers.TryAdd("X-Trace-Id", context.TraceIdentifier);
@@ -210,6 +212,10 @@ namespace Juice.Audit.AspNetCore.Middleware
                 context.Request.Host.ToString()
                 )
             ;
+            if (_routeValues != null)
+            {
+                requestInfo.SetData(_routeValues.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
+            }
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
         }
 
@@ -246,11 +252,29 @@ namespace Juice.Audit.AspNetCore.Middleware
                 auditContextAccessor.AuditContext.SetUser(GetUser(context));
                 tracker.Checkpoint("SetUser");
             }
+            var dict = new Dictionary<string, object>();
             if (context.Request.HasFormContentType)
             {
-                auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
-                tracker.Checkpoint("SetFormData");
+                dict = context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
             }
+            if (_routeValues != null)
+            {
+                foreach (var kvp in _routeValues)
+                {
+                    if (!dict.ContainsKey(kvp.Key))
+                    {
+                        dict.Add(kvp.Key, kvp.Value);
+                    }
+                }
+            }
+            auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(dict);
+            tracker.Checkpoint("SetFormData");
+
+            if (!string.IsNullOrEmpty(_action))
+            {
+                auditContextAccessor.AuditContext.SetAction(_action);
+            }
+            
             auditContextAccessor.AuditContext.UpdateResponseInfo(responseInfo =>
             {
                 if (ex != null)

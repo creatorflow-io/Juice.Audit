@@ -134,8 +134,12 @@ app.MapGet("/err/403", async (ctx) =>
     await ctx.Response.WriteAsync("403");
 });
 
+app.MapGet("/api/{id}/status", async (int id) =>
+{
+    return Results.Ok(id);
+});
 // Use with ConfigureAuditDefault together
-//await MigrateAsync(app);
+await MigrateAsync(app);
 
 app.Run();
 

@@ -1,14 +1,18 @@
-﻿namespace Juice.Audit.AspNetCore.Middleware
+﻿using System.Data;
+using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Routing;
+
+namespace Juice.Audit.AspNetCore.Middleware
 {
     public class AuditFilterOptions
     {
         public int? ExecutionTimeThreshold { get; set; }
         public int RequestAbortedStatusCode { get; set; } = 408;
-        public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();
+        public PathFilterEntry[] Filters { get; set; } = [];
 
         public AuditFilterOptions Clear()
         {
-            Filters = Array.Empty<PathFilterEntry>();
+            Filters = [];
             return this;
         }
 
@@ -16,14 +20,13 @@
         {
             var newFilters = new List<PathFilterEntry>(Filters)
             {
-                new PathFilterEntry
-                {
+                new() {
                     Path = path,
                     Methods = methods,
                     Priority = Filters.Length
                 }
             };
-            Filters = newFilters.ToArray();
+            Filters = [.. newFilters];
             return this;
         }
 
@@ -31,15 +34,14 @@
         {
             var newFilters = new List<PathFilterEntry>(Filters)
             {
-                new PathFilterEntry
-                {
+                new() {
                     Path = path,
                     Methods = methods,
                     StatusCodes = statusCodes,
                     Priority = Filters.Length
                 }
             };
-            Filters = newFilters.ToArray();
+            Filters = [.. newFilters];
             return this;
         }
 
@@ -47,15 +49,14 @@
         {
             var newFilters = new List<PathFilterEntry>(Filters)
             {
-                new PathFilterEntry
-                {
+                new() {
                     Path = path,
                     Methods = methods,
                     Priority = Filters.Length,
                     IsExcluded = true
                 }
             };
-            Filters = newFilters.ToArray();
+            Filters = [.. newFilters];
             return this;
         }
 
@@ -63,8 +64,7 @@
         {
             var newFilters = new List<PathFilterEntry>(Filters)
             {
-                new PathFilterEntry
-                {
+                new() {
                     Path = path,
                     Methods = methods,
                     StatusCodes = statusCodes,
@@ -72,7 +72,7 @@
                     IsExcluded = true
                 }
             };
-            Filters = newFilters.ToArray();
+            Filters = [.. newFilters];
             return this;
         }
 
@@ -80,51 +80,56 @@
         {
             var newFilters = new List<PathFilterEntry>(Filters);
             newFilters.AddRange(entries.Where(e => !IsExists(e) || e.Priority != 0).ToArray());
-            Filters = newFilters.ToArray();
+            Filters = [.. newFilters];
             return this;
         }
 
-        public bool IsMatch(string path, string method)
-            => IsMatch(path, method, out var _);
-        public bool IsMatch(string path, string method, out string? rule)
+        public bool IsMatch(string path, string method, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
         {
-            if (Filters.Length == 0 || Filters.Any(f => f.StatusCodes.Length != 0) || ExecutionTimeThreshold.HasValue)
+            if (Filters.Length == 0 || ExecutionTimeThreshold.HasValue)
             {
                 rule = null;
+                action = null;
+                routeValues = null;
                 return true;
             }
 
             foreach (var filter in Filters.OrderByDescending(f => f.Priority))
             {
-                if (filter.IsMatch(path, method))
+                if (filter.IsMatch(path, method, out var route, out routeValues))
                 {
+                    action = StringUtils.PathToAction(route);
                     rule = filter.Path;
                     return !filter.IsExcluded;
                 }
             }
             rule = null;
+            action = null;
+            routeValues = null;
             return false;
         }
 
-        public bool IsMatch(string path, string method, int statusCode)
-            => IsMatch(path, method, statusCode, out var _);
-
-        public bool IsMatch(string path, string method, int statusCode, out string? rule)
+        public bool IsMatch(string path, string method, int statusCode, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
         {
             if (Filters.Length == 0)
             {
                 rule = null;
+                action = null;
+                routeValues = null;
                 return true;
             }
             foreach (var filter in Filters.OrderByDescending(f => f.Priority))
             {
-                if (filter.IsMatch(path, method, statusCode))
+                if (filter.IsMatch(path, method, statusCode, out var route, out routeValues))
                 {
                     rule = filter.Path;
+                    action = StringUtils.PathToAction(route);
                     return !filter.IsExcluded;
                 }
             }
             rule = null;
+            action = null;
+            routeValues = null;
             return false;
         }
 
@@ -138,23 +143,23 @@
                                                                                        && f.IsExcluded == entry.IsExcluded);
         }
 
-        public string[] ReqHeaders = new string[] {
+        public string[] ReqHeaders = [
             ":authority:",
             "accept-#",
             "content-*",
             "x-forwarded-#",
             "referer",
             "user-agent"
-        };
+        ];
 
-        public string[] ResHeaders = new string[]
-        {
+        public string[] ResHeaders =
+        [
             "content-*"
-        };
+        ];
 
         public AuditFilterOptions StoreEmptyRequestHeaders()
         {
-            ReqHeaders = Array.Empty<string>();
+            ReqHeaders = [];
             return this;
         }
 
@@ -162,7 +167,7 @@
         {
             var newHeaders = new List<string>(ReqHeaders);
             newHeaders.AddRange(headers);
-            ReqHeaders = newHeaders.ToArray();
+            ReqHeaders = [.. newHeaders];
             return this;
         }
 
@@ -176,7 +181,7 @@
         {
             var newHeaders = new List<string>(ResHeaders);
             newHeaders.AddRange(headers);
-            ResHeaders = newHeaders.ToArray();
+            ResHeaders = [.. newHeaders];
             return this;
         }
 
@@ -200,18 +205,20 @@
         public int Priority { get; set; } = 0;
         public bool IsExcluded { get; set; } = false;
         public string Path { get; set; } = string.Empty;
-        public string[] Methods { get; set; } = Array.Empty<string>();
-        public int[] StatusCodes { get; set; } = Array.Empty<int>();
+        public string[] Methods { get; set; } = [];
+        public int[] StatusCodes { get; set; } = [];
         public bool IsGlobal => Path == string.Empty;
-        public bool IsMatch(string path, string method)
+
+        public bool IsMatch(string path, string method, out string? action, out IDictionary<string, string>? routeValues)
         {
-            return (IsGlobal || StringUtils.IsPathMatch(path, Path))
+            var match = StringUtils.IsPathMatch(path, Path, out action, out routeValues);
+            return (IsGlobal || match)
                 && (Methods.Length == 0 || Methods.Contains(method, new StringComparer()));
         }
 
-        public bool IsMatch(string path, string method, int statusCode)
+        public bool IsMatch(string path, string method, int statusCode, out string? action, out IDictionary<string, string>? routeValues)
         {
-            return IsMatch(path, method)
+            return IsMatch(path, method, out action, out routeValues)
                 && (StatusCodes.Length == 0 || StatusCodes.Contains(statusCode));
         }
     }
