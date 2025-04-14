@@ -28,7 +28,7 @@
     <TestSdk>17.11.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
     <JuiceVersion>8.3.*$(JuiceRefSuffix)</JuiceVersion>
-    <JuiceMeasurement>8.3.1</JuiceMeasurement>
+    <JuiceMeasurement>8.3.*</JuiceMeasurement>
   </PropertyGroup>
 
 
