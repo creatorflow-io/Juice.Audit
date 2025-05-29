@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace Juice.Audit
 {
-    public class AuditContext(string action, string? user) : IDisposable
+    public class AuditContext : IDisposable
     {
         public bool IsRequestedForMeasureLog(TimeSpan elapsed)
             => _requestMeasureLog && (!_requestMeasureLogThreshold.HasValue || elapsed >= _requestMeasureLogThreshold);
@@ -16,17 +16,22 @@ namespace Juice.Audit
         public bool IsRequestedForAccessLog(int statusCode)
             => _requestAccessLog && (_requestAccessLogHttpStatusCodes.Length == 0 || _requestAccessLogHttpStatusCodes.Contains(statusCode));
         private bool _requestAccessLog;
-        private int[] _requestAccessLogHttpStatusCodes = [];
+        private int[] _requestAccessLogHttpStatusCodes = Array.Empty<int>();
 
         public bool IsRequestedForAuditLog => AuditEntries.Count > 0;
         public Version? Version => Assembly.GetEntryAssembly()?.GetName().Version;
-        public AccessLog AccessRecord { get; private set; } = new AccessLog(action, user);
-        public List<DataAudit> AuditEntries { get; private set; } = [];
+        public AccessLog AccessRecord { get; private set; }
+        public List<DataAudit> AuditEntries { get; private set; } = new();
+
+        public AuditContext(string action, string? user)
+        {
+            AccessRecord = new AccessLog(action, user);
+        }
 
         /// <summary>
         /// Shared data between different parts of the application
         /// </summary>
-        public Dictionary<string, object?> Items { get; private set; } = [];
+        public Dictionary<string, object?> Items { get; private set; } = new();
 
         public void SetAction(string action)
             => AccessRecord.SetAction(action);
@@ -74,7 +79,7 @@ namespace Juice.Audit
                     // dispose managed state (managed objects).
                     AuditEntries.Clear();
                     Items.Clear();
-                    _requestAccessLogHttpStatusCodes = [];
+                    _requestAccessLogHttpStatusCodes = Array.Empty<int>();
                 }
                 _disposed = true;
             }

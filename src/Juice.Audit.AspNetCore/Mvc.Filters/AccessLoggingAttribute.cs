@@ -21,7 +21,7 @@ namespace Juice.Audit.AspNetCore.Mvc.Filters
         /// <summary>
         /// The methods that will trigger the access log, applicable only for page.
         /// </summary>
-        public string[] Methods { get; set; } = [];
+        public string[] Methods { get; set; } = Array.Empty<string>();
         public AccessLoggingAttribute(params int[] statusCodes)
         {
             _statusCodes = statusCodes;

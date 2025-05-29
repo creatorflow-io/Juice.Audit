@@ -16,8 +16,6 @@
 
     <ItemGroup>
         <PackageReference Include="MediatR" Version="$(MediatRVersion)" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"
-                          Version="$(MicrosoftExtensionsVersion)" />
         <PackageReference Include="Grpc.Net.ClientFactory" Version="$(GrpcVersion)" />
     </ItemGroup>
 

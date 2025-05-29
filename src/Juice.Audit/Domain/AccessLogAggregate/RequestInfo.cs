@@ -47,7 +47,6 @@ namespace Juice.Audit.Domain.AccessLogAggregate
 
         public void SetData(Dictionary<string, object>? data) => Data = data == null ? null : JsonConvert.SerializeObject(data);
 
-        protected override IEnumerable<object> GetEqualityComponents() =>
-            [TraceId];
+        protected override IEnumerable<object> GetEqualityComponents() => new []{TraceId};
     }
 }

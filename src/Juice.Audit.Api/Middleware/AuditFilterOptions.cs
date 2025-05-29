@@ -8,11 +8,11 @@ namespace Juice.Audit.AspNetCore.Middleware
     {
         public int? ExecutionTimeThreshold { get; set; }
         public int RequestAbortedStatusCode { get; set; } = 408;
-        public PathFilterEntry[] Filters { get; set; } = [];
+        public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();
 
         public AuditFilterOptions Clear()
         {
-            Filters = [];
+            Filters = Array.Empty<PathFilterEntry>();
             return this;
         }
 
@@ -26,7 +26,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     Priority = Filters.Length
                 }
             };
-            Filters = [.. newFilters];
+            Filters = newFilters.ToArray();
             return this;
         }
 
@@ -41,7 +41,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     Priority = Filters.Length
                 }
             };
-            Filters = [.. newFilters];
+            Filters = newFilters.ToArray();
             return this;
         }
 
@@ -56,7 +56,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     IsExcluded = true
                 }
             };
-            Filters = [.. newFilters];
+            Filters = newFilters.ToArray();
             return this;
         }
 
@@ -72,7 +72,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     IsExcluded = true
                 }
             };
-            Filters = [.. newFilters];
+            Filters = newFilters.ToArray();
             return this;
         }
 
@@ -80,7 +80,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             var newFilters = new List<PathFilterEntry>(Filters);
             newFilters.AddRange(entries.Where(e => !IsExists(e) || e.Priority != 0).ToArray());
-            Filters = [.. newFilters];
+            Filters = newFilters.ToArray();
             return this;
         }
 
@@ -143,23 +143,23 @@ namespace Juice.Audit.AspNetCore.Middleware
                                                                                        && f.IsExcluded == entry.IsExcluded);
         }
 
-        public string[] ReqHeaders = [
+        public string[] ReqHeaders = new string[] {
             ":authority:",
             "accept-#",
             "content-*",
             "x-forwarded-#",
             "referer",
             "user-agent"
-        ];
+        };
 
-        public string[] ResHeaders =
-        [
+        public string[] ResHeaders = new string[]
+        {
             "content-*"
-        ];
+        };
 
         public AuditFilterOptions StoreEmptyRequestHeaders()
         {
-            ReqHeaders = [];
+            ReqHeaders = Array.Empty<string>();
             return this;
         }
 
@@ -167,7 +167,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             var newHeaders = new List<string>(ReqHeaders);
             newHeaders.AddRange(headers);
-            ReqHeaders = [.. newHeaders];
+            ReqHeaders = newHeaders.ToArray();
             return this;
         }
 
@@ -181,7 +181,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             var newHeaders = new List<string>(ResHeaders);
             newHeaders.AddRange(headers);
-            ResHeaders = [.. newHeaders];
+            ResHeaders = newHeaders.ToArray();
             return this;
         }
 
@@ -205,8 +205,8 @@ namespace Juice.Audit.AspNetCore.Middleware
         public int Priority { get; set; } = 0;
         public bool IsExcluded { get; set; } = false;
         public string Path { get; set; } = string.Empty;
-        public string[] Methods { get; set; } = [];
-        public int[] StatusCodes { get; set; } = [];
+        public string[] Methods { get; set; } = Array.Empty<string>();
+        public int[] StatusCodes { get; set; } = Array.Empty<int>();
         public bool IsGlobal => Path == string.Empty;
 
         public bool IsMatch(string path, string method, out string? action, out IDictionary<string, string>? routeValues)

@@ -11,7 +11,7 @@ namespace Juice.Audit.Tests.Host.Controllers
             return NotFound();
         }
 
-        [AccessLogging([StatusCodes.Status404NotFound])]
+        [AccessLogging(StatusCodes.Status404NotFound)]
         public IActionResult ShouldFound()
         {
             return Ok();

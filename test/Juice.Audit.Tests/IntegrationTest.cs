@@ -13,9 +13,16 @@ using Xunit.Abstractions;
 
 namespace Juice.Audit.Tests
 {
-    public class IntegrationTest(WebApplicationFactory<Program> factory, ITestOutputHelper output)
+    public class IntegrationTest
         : IClassFixture<WebApplicationFactory<Program>>
     {
+        private readonly WebApplicationFactory<Program> factory;
+        private readonly ITestOutputHelper output;
+        public IntegrationTest(WebApplicationFactory<Program> factory, ITestOutputHelper output)
+        {
+            this.factory = factory;
+            this.output = output;
+        }
         [IgnoreOnCIFact(DisplayName = "Should request log")]
         public async Task Should_request_logAsync()
         {
@@ -71,7 +78,7 @@ namespace Juice.Audit.Tests
             accessLog!.Action.Should().Be("api_{id}_status");
             accessLog.Request?.Data.Should().NotBeNullOrEmpty();
 
-            var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(accessLog.Request!.Data!)??[];
+            var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(accessLog.Request!.Data!)??new();
             data.Should().ContainKey("id");
             data["id"].Should().Be(id.ToString());
 

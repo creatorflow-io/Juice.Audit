@@ -29,6 +29,6 @@
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Juice.XUnit" Version="$(JuiceVersion)" />
-        <PackageReference Label="Integration tests" Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftExtensionsVersion)" />
+        <PackageReference Label="Integration tests" Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MvcTesting)" />
     </ItemGroup>
 </Project>
