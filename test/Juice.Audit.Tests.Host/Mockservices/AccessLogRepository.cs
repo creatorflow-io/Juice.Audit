@@ -20,7 +20,12 @@ namespace Juice.Audit.Tests.Host.Mockservices
             return Task.FromResult(OperationResult.Result(entity));
         }
         public Task<IOperationResult> DeleteAsync(AccessLog entity, CancellationToken token) => throw new NotImplementedException();
+        public Task<bool> ExistsAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
         public Task<AccessLog?> FindAsync(Expression<Func<AccessLog, bool>> predicate, CancellationToken token) => throw new NotImplementedException();
+        public Task<AccessLog?> FindAsync(Expression<Func<AccessLog, bool>> predicate, bool readOnly = false, CancellationToken token = default) => throw new NotImplementedException();
+        public Task<AccessLog?> GetAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
+        public IQueryable<AccessLog> Query() => throw new NotImplementedException();
+        public Task<AccessLog?> ReadAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
         public Task<IOperationResult> UpdateAsync(AccessLog entity, CancellationToken token) => throw new NotImplementedException();
     }
 }

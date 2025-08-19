@@ -84,32 +84,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             return this;
         }
 
-        public bool IsMatch(string path, string method, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
-        {
-            if (Filters.Length == 0 || ExecutionTimeThreshold.HasValue)
-            {
-                rule = null;
-                action = null;
-                routeValues = null;
-                return true;
-            }
-
-            foreach (var filter in Filters.OrderByDescending(f => f.Priority))
-            {
-                if (filter.IsMatch(path, method, out var route, out routeValues))
-                {
-                    action = StringUtils.PathToAction(route);
-                    rule = filter.Path;
-                    return !filter.IsExcluded;
-                }
-            }
-            rule = null;
-            action = null;
-            routeValues = null;
-            return false;
-        }
-
-        public bool IsMatch(string path, string method, int statusCode, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
+        public bool IsMatch(string path, string method, int? statusCode, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
         {
             if (Filters.Length == 0)
             {
@@ -122,7 +97,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             {
                 if (filter.IsMatch(path, method, statusCode, out var route, out routeValues))
                 {
-                    rule = filter.Path;
+                    rule = filter.ToString();
                     action = StringUtils.PathToAction(route);
                     return !filter.IsExcluded;
                 }
@@ -132,7 +107,8 @@ namespace Juice.Audit.AspNetCore.Middleware
             routeValues = null;
             return false;
         }
-
+        public bool IsMatch(string path, string method, out string? rule, out string? action, out IDictionary<string, string>? routeValues)
+            => IsMatch(path, method, null, out rule, out action, out routeValues);
         public bool IsExists(PathFilterEntry entry)
         {
             return Filters.Any(f => (f.Path == entry.Path || (f.IsGlobal && entry.IsGlobal))
@@ -209,17 +185,25 @@ namespace Juice.Audit.AspNetCore.Middleware
         public int[] StatusCodes { get; set; } = Array.Empty<int>();
         public bool IsGlobal => Path == string.Empty;
 
-        public bool IsMatch(string path, string method, out string? action, out IDictionary<string, string>? routeValues)
+        private bool IsMatch(string path, string method, out string? action, out IDictionary<string, string>? routeValues)
         {
             var match = StringUtils.IsPathMatch(path, Path, out action, out routeValues);
             return (IsGlobal || match)
                 && (Methods.Length == 0 || Methods.Contains(method, new StringComparer()));
         }
 
-        public bool IsMatch(string path, string method, int statusCode, out string? action, out IDictionary<string, string>? routeValues)
+        public bool IsMatch(string path, string method, int? statusCode, out string? action, out IDictionary<string, string>? routeValues)
         {
             return IsMatch(path, method, out action, out routeValues)
-                && (StatusCodes.Length == 0 || StatusCodes.Contains(statusCode));
+                && (!statusCode.HasValue || StatusCodes.Length == 0 || StatusCodes.Contains(statusCode.Value));
+        }
+
+        override public string ToString()
+        {
+            var methods = Methods.Length > 0 ? string.Join(",", Methods) : "All";
+            var statusCodes = StatusCodes.Length > 0 ? string.Join(",", StatusCodes) : "All";
+            var path = IsGlobal ? "*" : Path;
+            return $"{(IsExcluded ? "Exclude" : "Include")} {path} [{methods}] [{statusCodes}] (Priority: {Priority})";
         }
     }
 

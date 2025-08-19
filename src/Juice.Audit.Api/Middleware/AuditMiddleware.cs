@@ -1,6 +1,8 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Reflection;
 using System.Security.Claims;
+using Grpc.Core;
 using Juice.Audit.Api.Extensions;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Measurement;
@@ -21,13 +23,11 @@ namespace Juice.Audit.AspNetCore.Middleware
         private string? _action;
         private IDictionary<string, string>? _routeValues;
 
-        public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options, string action, IDictionary<string, string> routeValues)
+        public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options)
         {
             _next = next;
             _appName = appName;
             _filter = options;
-            _routeValues = routeValues;
-            _action = action;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -36,7 +36,6 @@ namespace Juice.Audit.AspNetCore.Middleware
             var logger = context.RequestServices.GetRequiredService<ILogger<AuditMiddleware>>();
 
             using var tracker = context.RequestServices.GetService<ITimeTracker>() ?? new TimeTracker();
-
             try
             {
                 InitAuditContext(auditContextAccessor, context);
@@ -62,6 +61,7 @@ namespace Juice.Audit.AspNetCore.Middleware
 
             bool isMatch = false;
             bool isTimeExceeded = false;
+            bool isMeasureRequested = false;
             try
             {
                 using (tracker.BeginScope("Invoke"))
@@ -73,25 +73,37 @@ namespace Juice.Audit.AspNetCore.Middleware
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
                     : context.Response.StatusCode;
-                isTimeExceeded =
-                    auditContextAccessor.AuditContext.IsRequestedForMeasureLog(tracker.ElapsedTime)
-                    || _filter.ExecutionTimeThreshold.HasValue && tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
 
-                isMatch = auditContextAccessor.AuditContext.IsRequestedForAccessLog(status)
+                isMeasureRequested = auditContextAccessor.AuditContext.IsRequestedForMeasureLog(tracker.ElapsedTime);
+                isTimeExceeded = _filter.ExecutionTimeThreshold.HasValue && tracker.ElapsedTime.TotalMilliseconds > _filter.ExecutionTimeThreshold;
+
+                var isRequested = auditContextAccessor.AuditContext.IsRequestedForAccessLog(status);
+                var rule = string.Empty;
+                var isFilterMatched = _filter.IsMatch(context.Request.Path, context.Request.Method, status, out rule, out _action, out _routeValues);
+                isMatch = isRequested
                     || auditContextAccessor.AuditContext.IsRequestedForAuditLog
                     || isTimeExceeded
-                    || _filter.IsMatch(context.Request.Path, context.Request.Method, status, out _, out _action, out _routeValues);
-                
-                if (!isMatch && !isTimeExceeded)
+                    || isMeasureRequested
+                    || isFilterMatched;
+
+                if (logger.IsEnabled(LogLevel.Debug))
                 {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug("AuditMiddleware.InvokeAsync: Skip CollectResponseInfo because the conditions do not match. Status: {0}; AccessLog requested: {1}; DataAudit requested: {2}; TimeExceeded: {3}",
-                            status, auditContextAccessor.AuditContext.IsRequestedForAccessLog(status), auditContextAccessor.AuditContext.IsRequestedForAuditLog, isTimeExceeded);
-                    }
-                    return;
+                    logger.LogDebug("Path {0}. Status: {1}; AccessLog requested: {2}; DataAudit requested: {3};  TimeExceeded: {4}; MeasureRequested {5}; FilterMatched {6} {7}",
+                        context.Request.Path, status,
+                        isRequested, auditContextAccessor.AuditContext.IsRequestedForAuditLog, isTimeExceeded, isMeasureRequested, isFilterMatched, rule
+                        );
                 }
 
+                if (!isMatch)
+                {
+                    return;
+                }
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["FilterMatched"] = isFilterMatched;
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["FilterRule"] = rule;
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["AccessLogRequest"] = isRequested;
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["DataAuditRequest"] = auditContextAccessor.AuditContext.IsRequestedForAuditLog;
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["MeasureRequested"] = isMeasureRequested;
+                auditContextAccessor.AuditContext.AccessRecord.Metadata["TimeExceeded"] = isTimeExceeded;
                 try
                 {
                     PostRequestColllectInfo(auditContextAccessor, context, tracker);
@@ -149,7 +161,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     }
                 }
 
-                if (isTimeExceeded)
+                if (isTimeExceeded || isMeasureRequested)
                 {
                     try
                     {
@@ -188,7 +200,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         {
             var (path, id) = context.Request.Path.GetPathComponents();
 
-            var action = _action ?? StringUtils.PathToAction(path) ?? "Unknown";
+            var action = StringUtils.PathToAction(path) ?? "Unknown";
 
             auditContextAccessor.Init(action, GetUser(context));
             context.Response.Headers.TryAdd("X-Trace-Id", context.TraceIdentifier);
@@ -212,10 +224,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 context.Request.Host.ToString()
                 )
             ;
-            if (_routeValues != null)
-            {
-                requestInfo.SetData(_routeValues.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value));
-            }
+            
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
         }
 
@@ -253,22 +262,29 @@ namespace Juice.Audit.AspNetCore.Middleware
                 tracker.Checkpoint("SetUser");
             }
             var dict = new Dictionary<string, object>();
-            if (context.Request.HasFormContentType)
+            try
             {
-                dict = context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
-            }
-            if (_routeValues != null)
-            {
-                foreach (var kvp in _routeValues)
+                if (context.Request.HasFormContentType)
                 {
-                    if (!dict.ContainsKey(kvp.Key))
+                    dict = context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
+                }
+                if (_routeValues != null)
+                {
+                    foreach (var kvp in _routeValues)
                     {
-                        dict.Add(kvp.Key, kvp.Value);
+                        if (!dict.ContainsKey(kvp.Key))
+                        {
+                            dict.Add(kvp.Key, kvp.Value);
+                        }
                     }
                 }
+                auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(dict);
+                tracker.Checkpoint("SetFormData");
+
             }
-            auditContextAccessor.AuditContext.AccessRecord.Request?.SetData(dict);
-            tracker.Checkpoint("SetFormData");
+            catch { /* ignore */
+                tracker.Checkpoint("SetFormDataFailure");
+            }
 
             if (!string.IsNullOrEmpty(_action))
             {

@@ -134,40 +134,40 @@ namespace Juice.Audit.Tests
             _output.WriteLine($"kernel/info does not matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info", "POST", out rule, out action, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/#");
+            rule.Should().Contain("kernel/*/#");
             action.Should().Be("kernel_info");
             _output.WriteLine($"kernel/info matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info/index", "GET", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/index");
+            rule.Should().Contain("kernel/*/index");
             _output.WriteLine($"kernel/info/index matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info/index", "POST", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/index");
+            rule.Should().Contain("kernel/*/index");
             _output.WriteLine($"kernel/info/index matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info/x", "PUT", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/#");
+            rule.Should().Contain("kernel/*/#");
             _output.WriteLine($"kernel/info/x matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info/x", "POST", out rule, out _, out _).Should().BeFalse();
-            rule.Should().BeSameAs("kernel/*/*");
+            rule.Should().Contain("kernel/*/*");
             _output.WriteLine($"kernel/info/x does not matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel/info/x/y/z", "PATCH", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/#");
+            rule.Should().Contain("kernel/*/#");
             _output.WriteLine($"kernel/info/x/y/z matched. {rule ?? "none"}");
 
             filter.IsMatch("kernel", "POST", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("");
+            rule.Should().Contain("POST");
             _output.WriteLine($"kernel matched. {rule ?? "none"}");
 
             filter.IsMatch("ker/info/index", "POST", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("");
+            rule.Should().Contain("POST");
             _output.WriteLine($"ker/info/index matched. {rule ?? "none"}");
 
             filter.IsMatch("ker/kernel/index", "GET", out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("*/kernel/*");
+            rule.Should().Contain("*/kernel/*");
             _output.WriteLine($"ker/kernel/index matched. {rule ?? "none"}");
 
             filter.IsMatch("/signalrhub/negotiate", "POST", out rule, out _, out _).Should().BeFalse();
@@ -189,11 +189,11 @@ namespace Juice.Audit.Tests
             string? action = default;
 
             filter.IsMatch("kernel/info/x/y", "GET", out rule, out action, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/{id}/#");
+            rule.Should().Contain("kernel/*/{id}/#");
             action.Should().Be("kernel_info_{id}_y");
 
             filter.IsMatch("kernel/info/6/y", "GET", out rule, out action, out _).Should().BeTrue();
-            rule.Should().BeSameAs("kernel/*/{id}/#");
+            rule.Should().Contain("kernel/*/{id}/#");
             action.Should().Be("kernel_info_{id}_y");
         }
 
@@ -207,17 +207,13 @@ namespace Juice.Audit.Tests
 
             string? rule = default;
             filter.IsMatch("kernel/info", "GET", out rule, out _, out _).Should().BeTrue();
-            rule.Should().Be("");
-
+            rule.Should().Contain("403");
             filter.IsMatch("kernel/info", "POST", out rule, out _, out _).Should().BeTrue();
-            rule.Should().Be("");
-
+            rule.Should().Contain("403");
             filter.IsMatch("kernel/info", "POST", 403, out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("");
-
+            rule.Should().Contain("403");
             filter.IsMatch("kernel/info", "POST", 404, out rule, out _, out _).Should().BeTrue();
-            rule.Should().BeSameAs("");
-
+            rule.Should().Contain("POST");
             filter.IsMatch("kernel/info", "GET", 404, out rule, out _, out _).Should().BeFalse();
             rule.Should().BeSameAs(null);
         }

@@ -19,22 +19,9 @@ namespace Juice.Audit.AspNetCore.Extensions
         {
             var options = new AuditFilterOptions();
             configure?.Invoke(options);
-            
 
-            if (options.Filters.Length == 0)
-            {
-                app.UseMiddleware<AuditMiddleware>(appName, options, string.Empty, new Dictionary<string, string>());
-            }
-            else
-            {
-                string? action = default;
-                IDictionary<string, string>? routeValues = default;
-                app.UseWhen(context =>
-                        options.IsMatch(
-                            context.Request.Path, context.Request.Method, out _, out action, out routeValues),
-                            appBuilder => appBuilder.UseMiddleware<AuditMiddleware>(appName, options, action ?? string.Empty, routeValues ?? new Dictionary<string, string>())
-                );
-            }
+            app.UseMiddleware<AuditMiddleware>(appName, options);
+
             return app;
         }
 

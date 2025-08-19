@@ -25,7 +25,12 @@ namespace Juice.Audit.Tests.Host.Mockservices
             return Task.CompletedTask;
         }
         public Task<IOperationResult> DeleteAsync(DataAudit entity, CancellationToken token) => throw new NotImplementedException();
+        public Task<bool> ExistsAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
         public Task<DataAudit?> FindAsync(Expression<Func<DataAudit, bool>> predicate, CancellationToken token) => throw new NotImplementedException();
+        public Task<DataAudit?> FindAsync(Expression<Func<DataAudit, bool>> predicate, bool readOnly = false, CancellationToken token = default) => throw new NotImplementedException();
+        public Task<DataAudit?> GetAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
+        public IQueryable<DataAudit> Query() => throw new NotImplementedException();
+        public Task<DataAudit?> ReadAsync<TKey>(TKey id, CancellationToken token = default) => throw new NotImplementedException();
         public Task<IOperationResult> UpdateAsync(DataAudit entity, CancellationToken token) => throw new NotImplementedException();
     }
 }
