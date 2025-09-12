@@ -10,7 +10,7 @@
     <PackageIconUrl>https://avatars.githubusercontent.com/u/107674950</PackageIconUrl>
     <RepositoryUrl>https://github.com/creatorflow-io/Juice.Audit</RepositoryUrl>
 
-    <VersionPrefix>8.4.1</VersionPrefix>
+    <VersionPrefix>8.5.0</VersionPrefix>
     <VersionSuffix>local.$([System.DateTime]::Now.ToString(`yyyyMMdd`)).1</VersionSuffix>
   </PropertyGroup>
 
@@ -28,7 +28,7 @@
     <TestSdk>17.11.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
     <JuiceVersion>8.4.*$(JuiceRefSuffix)</JuiceVersion>
-    <JuiceMeasurement>8.4.*$(JuiceRefSuffix)</JuiceMeasurement>
+    <JuiceMeasurement>8.5.*$(JuiceRefSuffix)</JuiceMeasurement>
   </PropertyGroup>
 
 
