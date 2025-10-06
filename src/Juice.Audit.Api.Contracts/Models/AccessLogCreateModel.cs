@@ -1,5 +1,4 @@
-﻿using Juice.Domain;
-
+﻿
 namespace Juice.Audit.Api.Contracts.Models
 {
     public class AccessLogCreateModel : IValidatable
@@ -26,10 +25,10 @@ namespace Juice.Audit.Api.Contracts.Models
             Response_Message = response_Message;
             Response_Error = response_Error;
             Response_ElapsedMilliseconds = response_ElapsedMilliseconds;
-            Server_MachineName = ValidatableExtensions.TrimExceededLength(server_MachineName, LengthConstants.NameLength) ?? "";
-            Server_OSVersion = ValidatableExtensions.TrimExceededLength(server_OSVersion, LengthConstants.NameLength) ?? "";
-            Server_SoftwareVersion = ValidatableExtensions.TrimExceededLength(server_SoftwareVersion, LengthConstants.NameLength) ?? "";
-            Server_AppName = ValidatableExtensions.TrimExceededLength(server_AppName, LengthConstants.NameLength) ?? "";
+            Server_MachineName = Validatable.TrimExceededLength(server_MachineName, LengthConstants.NameLength) ?? "";
+            Server_OSVersion = Validatable.TrimExceededLength(server_OSVersion, LengthConstants.NameLength) ?? "";
+            Server_SoftwareVersion = Validatable.TrimExceededLength(server_SoftwareVersion, LengthConstants.NameLength) ?? "";
+            Server_AppName = Validatable.TrimExceededLength(server_AppName, LengthConstants.NameLength) ?? "";
 
             this.NotNullOrWhiteSpace(Action, LengthConstants.NameLength);
 

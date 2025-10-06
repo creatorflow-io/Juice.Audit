@@ -1,7 +1,6 @@
 ﻿using Juice.Audit.Commands;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
-using MediatR;
 
 namespace Juice.Audit.CommandHandlers
 {
@@ -16,7 +15,7 @@ namespace Juice.Audit.CommandHandlers
             _auditRepository = auditRepository;
         }
 
-        public async Task<IOperationResult> Handle(SaveAuditInfoCommand request, CancellationToken cancellationToken)
+        public async ValueTask<IOperationResult> Handle(SaveAuditInfoCommand request, CancellationToken cancellationToken)
         {
             try
             {

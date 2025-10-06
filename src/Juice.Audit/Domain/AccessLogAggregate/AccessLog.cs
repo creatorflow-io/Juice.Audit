@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using Juice.Domain;
-using MediatR;
+using Juice.MediatR;
 using Newtonsoft.Json.Linq;
 
 namespace Juice.Audit.Domain.AccessLogAggregate

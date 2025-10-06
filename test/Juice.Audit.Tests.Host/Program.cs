@@ -5,7 +5,7 @@ using Juice.Audit.EF;
 using Juice.Domain.Events;
 using Juice.EF.Extensions;
 using Juice.Measurement.Stores.EF;
-using MediatR;
+using Juice.MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
 

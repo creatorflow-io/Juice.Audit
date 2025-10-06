@@ -11,8 +11,8 @@ namespace Juice.Audit.Domain.AccessLogAggregate
             Method = method;
             Path = path;
             Data = data;
-            Query = ValidatableExtensions.TrimExceededLength(queryString, LengthConstants.ShortDescriptionLength);
-            Headers = ValidatableExtensions.TrimExceededLength(headers, LengthConstants.ShortDescriptionLength);
+            Query = Validatable.TrimExceededLength(queryString, LengthConstants.ShortDescriptionLength);
+            Headers = Validatable.TrimExceededLength(headers, LengthConstants.ShortDescriptionLength);
             Scheme = scheme;
             RIPA = remoteIpAddress;
             TraceId = requestId;

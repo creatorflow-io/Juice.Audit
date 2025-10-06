@@ -1,7 +1,6 @@
 ﻿using Grpc.Net.ClientFactory;
 using Juice.Audit.Api.NotificationHandlers;
 using Juice.EF;
-using MediatR;
 using Microsoft.Extensions.Configuration;
 
 namespace Microsoft.Extensions.DependencyInjection

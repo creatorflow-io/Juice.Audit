@@ -35,7 +35,7 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         /// <param name="message"></param>
         public void TrySetMessage(string message)
         {
-            Msg ??= ValidatableExtensions.TrimExceededLength(message, LengthConstants.ShortDescriptionLength);
+            Msg ??= Validatable.TrimExceededLength(message, LengthConstants.ShortDescriptionLength);
         }
         /// <summary>
         /// Intended to be used for storing the response error and will fullfilled by custom middleware.
@@ -49,7 +49,7 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         public void SetResponseInfo(int statusCode, string headers, long elapsedMilliseconds)
         {
             Status = statusCode;
-            Headers = ValidatableExtensions.TrimExceededLength(headers, LengthConstants.ShortDescriptionLength);
+            Headers = Validatable.TrimExceededLength(headers, LengthConstants.ShortDescriptionLength);
             ElapsedMs = elapsedMilliseconds;
         }
     }

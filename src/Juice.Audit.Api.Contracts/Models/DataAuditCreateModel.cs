@@ -1,5 +1,4 @@
-﻿using Juice.Domain;
-
+﻿
 namespace Juice.Audit.Api.Contracts.Models
 {
     public class DataAuditCreateModel : IValidatable

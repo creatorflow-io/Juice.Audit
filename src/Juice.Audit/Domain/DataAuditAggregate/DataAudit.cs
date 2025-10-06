@@ -1,5 +1,4 @@
 ﻿using Juice.Domain;
-using MediatR;
 
 namespace Juice.Audit.Domain.DataAuditAggregate
 {

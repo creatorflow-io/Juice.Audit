@@ -7,10 +7,10 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         public ServerInfo() { }
         public ServerInfo(string machineName, string osVersion, string? softwareVersion, string appName)
         {
-            Machine = ValidatableExtensions.TrimExceededLength(machineName, LengthConstants.NameLength) ?? "";
-            OS = ValidatableExtensions.TrimExceededLength(osVersion, LengthConstants.NameLength) ?? "";
-            AppVer = ValidatableExtensions.TrimExceededLength(softwareVersion, LengthConstants.NameLength);
-            App = ValidatableExtensions.TrimExceededLength(appName, LengthConstants.NameLength) ?? "";
+            Machine = Validatable.TrimExceededLength(machineName, LengthConstants.NameLength) ?? "";
+            OS = Validatable.TrimExceededLength(osVersion, LengthConstants.NameLength) ?? "";
+            AppVer = Validatable.TrimExceededLength(softwareVersion, LengthConstants.NameLength);
+            App = Validatable.TrimExceededLength(appName, LengthConstants.NameLength) ?? "";
         }
         public string Machine { get; private set; }
         public string OS { get; private set; }

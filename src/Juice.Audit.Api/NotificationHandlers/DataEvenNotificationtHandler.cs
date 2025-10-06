@@ -1,5 +1,4 @@
 ﻿using Juice.Domain.Events;
-using MediatR;
 using Newtonsoft.Json;
 
 namespace Juice.Audit.Api.NotificationHandlers
@@ -14,7 +13,7 @@ namespace Juice.Audit.Api.NotificationHandlers
             _auditContextAccessor = auditContextAccessor;
         }
 
-        public Task Handle(T notification, CancellationToken cancellationToken)
+        public ValueTask Handle(T notification, CancellationToken cancellationToken)
         {
             var auditRecord = notification.AuditRecord;
             if (auditRecord != null)
@@ -31,7 +30,7 @@ namespace Juice.Audit.Api.NotificationHandlers
                     _auditContextAccessor.AuditContext.AccessRecord.TraceId
                     ));
             }
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 }

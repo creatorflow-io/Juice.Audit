@@ -5,7 +5,6 @@ using Juice.Audit.Api.Grpc.Services;
 using Juice.Audit.CommandHandlers;
 using Juice.Audit.Commands;
 using Juice.Audit.Services;
-using MediatR;
 
 namespace Microsoft.Extensions.DependencyInjection
 {

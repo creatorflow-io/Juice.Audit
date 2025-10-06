@@ -1,5 +1,5 @@
 ﻿using Juice.Audit.Domain.Events;
-using MediatR;
+using Juice.MediatR;
 
 namespace Juice.Audit.Tests.Host.Mockservices
 {
@@ -12,10 +12,10 @@ namespace Juice.Audit.Tests.Host.Mockservices
             _logger = logger;
         }
 
-        public Task Handle(AccessLogCreatedDomainEvent notification, CancellationToken cancellationToken)
+        public ValueTask Handle(AccessLogCreatedDomainEvent notification, CancellationToken cancellationToken)
         {
             _logger.LogInformation("AccessLogCreatedDomainEvent was handled! {0}", notification.RecordId);
-            return Task.CompletedTask;
+            return ValueTask.CompletedTask;
         }
     }
 }

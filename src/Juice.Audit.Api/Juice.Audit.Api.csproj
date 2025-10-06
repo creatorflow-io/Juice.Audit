@@ -10,6 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit.Api.Contracts\Juice.Audit.Api.Contracts.csproj" />
         <ProjectReference Include="..\Juice.Audit.EF\Juice.Audit.EF.csproj" />
+        <Using Include="Juice.MediatR"/>
     </ItemGroup>
 
     <ItemGroup>

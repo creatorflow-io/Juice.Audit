@@ -1,7 +1,6 @@
 ﻿using Grpc.Core;
 using Juice.Audit.Commands;
 using Juice.Audit.Grpc;
-using MediatR;
 
 namespace Juice.Audit.Api.Grpc.Services
 {

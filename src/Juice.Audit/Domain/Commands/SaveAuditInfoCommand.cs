@@ -1,6 +1,6 @@
 ﻿using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
-using MediatR;
+using Juice.MediatR;
 
 namespace Juice.Audit.Commands
 {

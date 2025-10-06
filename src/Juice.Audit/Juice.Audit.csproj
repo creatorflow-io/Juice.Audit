@@ -9,13 +9,14 @@
 
     <ItemGroup>
         <PackageReference Include="Juice" Version="$(JuiceVersion)" />
+        <PackageReference Include="Juice.MediatR" Version="$(JuiceVersion)" />
+        <Using Include="Juice.MediatR"/>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\Juice.Audit.Api.Contracts\Juice.Audit.Api.Contracts.csproj" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="MediatR" Version="$(MediatRVersion)" />
         <PackageReference Include="Grpc.Net.ClientFactory" Version="$(GrpcVersion)" />
     </ItemGroup>
 
