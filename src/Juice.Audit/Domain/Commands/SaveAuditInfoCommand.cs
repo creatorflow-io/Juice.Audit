@@ -1,10 +1,9 @@
 ﻿using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
-using Juice.MediatR;
 
 namespace Juice.Audit.Commands
 {
-    public class SaveAuditInfoCommand : IRequest<IOperationResult>
+    public record SaveAuditInfoCommand : MessageBase, IRequest<IOperationResult>
     {
         public AccessLog AccessLog { get; private set; }
         public DataAudit[] DataAuditEntries { get; private set; }

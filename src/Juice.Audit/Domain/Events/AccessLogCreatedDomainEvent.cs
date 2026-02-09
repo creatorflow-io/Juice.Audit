@@ -1,8 +1,7 @@
-﻿using Juice.MediatR;
-
+﻿
 namespace Juice.Audit.Domain.Events
 {
-    public class AccessLogCreatedDomainEvent : INotification
+    public record AccessLogCreatedDomainEvent : MessageBase, INotification
     {
         public Guid RecordId { get; private set; }
 
