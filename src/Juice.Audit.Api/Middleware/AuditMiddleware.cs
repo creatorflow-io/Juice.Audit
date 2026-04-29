@@ -23,6 +23,11 @@ namespace Juice.Audit.AspNetCore.Middleware
         private string? _action;
         private IDictionary<string, string>? _routeValues;
 
+        private string GetTraceId(HttpContext context)
+        {
+            return Activity.Current?.Id ?? context.TraceIdentifier;
+        }
+
         public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options)
         {
             _next = next;
@@ -42,7 +47,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 tracker.Checkpoint("InitAuditContext");
                 if(logger.IsEnabled(LogLevel.Debug))
                 {
-                    logger.LogDebug("Version: {0}", auditContextAccessor.AuditContext.Version);
+                    logger.LogDebug("Version: {0}, TraceId: {1}", auditContextAccessor.AuditContext.Version, GetTraceId(context));
                 }
             }
             catch (Exception ex)
@@ -170,7 +175,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                         _.Dispose();
                         if (timeRepository != null)
                         {
-                            await timeRepository.SaveTrackDataAsync(tracker, context.TraceIdentifier,
+                            await timeRepository.SaveTrackDataAsync(tracker, GetTraceId(context),
                                 auditContextAccessor.AuditContext.AccessRecord.Action,
                                 auditContextAccessor.AuditContext.AccessRecord.Action);
                         }
@@ -203,7 +208,7 @@ namespace Juice.Audit.AspNetCore.Middleware
             var action = StringUtils.PathToAction(path) ?? "Unknown";
 
             auditContextAccessor.Init(action, GetUser(context));
-            context.Response.Headers.TryAdd("X-Trace-Id", context.TraceIdentifier);
+            context.Response.Headers.TryAdd("X-Trace-Id", GetTraceId(context));
         }
 
         private void CollectRequestInfo(IAuditContextAccessor auditContextAccessor,
@@ -220,7 +225,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                     .ToDictionary(x => x.Key, x => x.Value)),
                 context.Request.Scheme,
                 context.Connection.RemoteIpAddress?.ToString(),
-                context.TraceIdentifier,
+                GetTraceId(context),
                 context.Request.Host.ToString()
                 )
             ;
