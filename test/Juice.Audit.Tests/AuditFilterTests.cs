@@ -3,7 +3,6 @@ using FluentAssertions;
 using Juice.Audit.Api.Extensions;
 using Juice.Audit.AspNetCore.Middleware;
 using Microsoft.AspNetCore.Http;
-using Xunit.Abstractions;
 
 namespace Juice.Audit.Tests
 {
