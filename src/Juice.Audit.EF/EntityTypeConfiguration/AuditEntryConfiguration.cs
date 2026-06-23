@@ -9,15 +9,13 @@ namespace Juice.Audit.EF.EntityTypeConfiguration
         IEntityTypeConfiguration<DataAudit>
     {
         private AuditDbContext _dbContext;
-        private string? _schema;
         public AuditEntryConfiguration(AuditDbContext context)
         {
-            _schema = context.Schema;
             _dbContext = context;
         }
         public void Configure(EntityTypeBuilder<DataAudit> builder)
         {
-            builder.ToTable(nameof(DataAudit), _schema);
+            builder.ToTable(nameof(DataAudit));
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id).ValueGeneratedOnAdd();
             builder.Property(x => x.User).HasMaxLength(LengthConstants.NameLength);

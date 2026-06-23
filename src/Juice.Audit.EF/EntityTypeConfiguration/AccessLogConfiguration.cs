@@ -9,16 +9,14 @@ namespace Juice.Audit.EF.EntityTypeConfiguration
 
         IEntityTypeConfiguration<AccessLog>
     {
-        private string? _schema;
         private AuditDbContext _dbContext;
         public AccessLogConfiguration(AuditDbContext context)
         {
-            _schema = context.Schema;
             _dbContext = context;
         }
         public void Configure(EntityTypeBuilder<AccessLog> builder)
         {
-            builder.ToTable(nameof(AccessLog), _schema);
+            builder.ToTable(nameof(AccessLog));
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id).ValueGeneratedOnAdd();
             builder.Property(x => x.User).HasMaxLength(LengthConstants.NameLength);
