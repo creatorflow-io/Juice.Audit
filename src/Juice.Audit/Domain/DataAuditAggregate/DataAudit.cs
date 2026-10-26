@@ -5,7 +5,7 @@ namespace Juice.Audit.Domain.DataAuditAggregate
     public class DataAudit : AggregateRoot<INotification>
     {
         public DataAudit() { }
-        public DataAudit(string? user, DateTimeOffset dateTime, string action, string? database, string? schema, string table, string keyValues, string dataChanges, string? traceId)
+        public DataAudit(string? user, DateTimeOffset dateTime, string action, string? database, string? schema, string table, string keyValues, string dataChanges, string? traceId, string? tenantId = default)
         {
             User = user;
             DateTime = dateTime;
@@ -16,10 +16,12 @@ namespace Juice.Audit.Domain.DataAuditAggregate
             Kvps = keyValues;
             Changes = dataChanges;
             TraceId = traceId;
+            TenantId = string.IsNullOrEmpty(tenantId) ? null : tenantId;
 
             this.NotNullOrWhiteSpace(Action, LengthConstants.NameLength);
 
             this.NotExceededLength(TraceId, LengthConstants.IdentityLength);
+            this.NotExceededLength(TenantId, Juice.MultiTenant.Constants.TenantIdMaxLength);
             this.NotExceededLength(User, LengthConstants.NameLength);
             this.NotExceededLength(Db, LengthConstants.NameLength);
             this.NotExceededLength(Schema, LengthConstants.NameLength);
@@ -42,6 +44,10 @@ namespace Juice.Audit.Domain.DataAuditAggregate
         public string Kvps { get; private set; }
         public string Changes { get; private set; }
         public string? TraceId { get; private set; }
+        /// <summary>
+        /// The tenant that owns the audited data. <c>null</c> for the root tenant or a non multi-tenant app.
+        /// </summary>
+        public string? TenantId { get; private set; }
 
         public void SetTraceId(string requestId)
             => TraceId = requestId;

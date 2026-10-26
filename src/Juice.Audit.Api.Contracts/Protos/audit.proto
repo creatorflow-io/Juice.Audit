@@ -15,6 +15,7 @@ message DataAuditMessage {
   bytes keyValues = 7;
   bytes dataChanges = 8;
   google.protobuf.StringValue reqId = 9;
+  google.protobuf.StringValue tenantId = 10;
 }
 
 message AccessLogMessage{
@@ -47,6 +48,7 @@ message AccessLogMessage{
   google.protobuf.StringValue srvApp = 24;
 
   bool restricted = 25;
+  google.protobuf.StringValue tenantId = 26;
 }
 
 message AuditRequest{

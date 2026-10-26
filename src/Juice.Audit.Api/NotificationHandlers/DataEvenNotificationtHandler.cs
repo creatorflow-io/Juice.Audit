@@ -27,7 +27,8 @@ namespace Juice.Audit.Api.NotificationHandlers
                     auditRecord.Table,
                     JsonConvert.SerializeObject(auditRecord.KeyValues),
                     JsonConvert.SerializeObject(new { auditRecord.OriginalValues, auditRecord.CurrentValues }),
-                    _auditContextAccessor.AuditContext.AccessRecord.TraceId
+                    _auditContextAccessor.AuditContext.AccessRecord.TraceId,
+                    notification.TenantId ?? _auditContextAccessor.AuditContext.TenantId
                     ));
             }
             return ValueTask.CompletedTask;

@@ -45,6 +45,10 @@ namespace Juice.Audit.EF.PostgreSQL.Migrations
                         .HasColumnType("jsonb")
                         .HasDefaultValueSql("'{}'");
 
+                    b.Property<string>("TenantId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("User")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -54,6 +58,8 @@ namespace Juice.Audit.EF.PostgreSQL.Migrations
                     b.HasIndex("DateTime");
 
                     b.HasIndex("IsRestricted");
+
+                    b.HasIndex("TenantId", "DateTime");
 
                     b.HasIndex("User", "Action");
 
@@ -104,6 +110,10 @@ namespace Juice.Audit.EF.PostgreSQL.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("TenantId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("User")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -113,6 +123,8 @@ namespace Juice.Audit.EF.PostgreSQL.Migrations
                     b.HasIndex("DateTime");
 
                     b.HasIndex("Kvps");
+
+                    b.HasIndex("TenantId", "DateTime");
 
                     b.HasIndex("TraceId");
 

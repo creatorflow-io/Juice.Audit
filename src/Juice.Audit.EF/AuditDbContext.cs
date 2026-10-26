@@ -1,5 +1,8 @@
-﻿using Juice.Audit.EF.EntityTypeConfiguration;
+﻿using Finbuckle.MultiTenant;
+using Finbuckle.MultiTenant.EntityFrameworkCore;
+using Juice.Audit.EF.EntityTypeConfiguration;
 using Juice.EF;
+using MultiTenantDbContext = Juice.MultiTenant.EF.MultiTenantDbContext;
 using Juice.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
@@ -8,8 +11,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Juice.Audit.EF
 {
-    public class AuditDbContext : DbContextBase
+    /// <summary>
+    /// Audit records are <see cref="Juice.EF.MultiTenant.SharingType.Global"/>: a tenant reads/writes only its own records,
+    /// the root tenant (no tenant resolved, e.g. the gRPC audit server or a non multi-tenant app) reads/writes all of them.
+    /// </summary>
+    public class AuditDbContext : MultiTenantDbContext
     {
+        public override TenantMismatchMode TenantMismatchMode { get; set; } = TenantMismatchMode.Throw;
+
+        // Records captured without a tenant (e.g. tenant resolved after the audit context was initialized)
+        // are stamped with the current tenant on save
+        public override TenantNotSetMode TenantNotSetMode { get; set; } = TenantNotSetMode.Overwrite;
+
         public DbSet<Domain.DataAuditAggregate.DataAudit> AuditEntries { get; set; }
         public DbSet<Domain.AccessLogAggregate.AccessLog> AccessLogs { get; set; }
         public AuditDbContext(DbContextOptions options) : base(options)

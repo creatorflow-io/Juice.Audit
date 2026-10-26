@@ -23,9 +23,16 @@ namespace Juice.Audit
         public AccessLog AccessRecord { get; private set; }
         public List<DataAudit> AuditEntries { get; private set; } = new();
 
+        public string? TenantId => AccessRecord.TenantId;
+
         public AuditContext(string action, string? user)
         {
             AccessRecord = new AccessLog(action, user);
+        }
+
+        public AuditContext(string action, string? user, string? tenantId)
+        {
+            AccessRecord = new AccessLog(action, user, tenantId);
         }
 
         /// <summary>
@@ -62,6 +69,9 @@ namespace Juice.Audit
 
         public void SetUser(string? user)
             => AccessRecord.SetUser(user);
+
+        public void SetTenant(string? tenantId)
+            => AccessRecord.SetTenant(tenantId);
 
         public override string ToString()
         {

@@ -37,6 +37,7 @@ namespace Juice.Audit.Api.Grpc.Services
                 AccessLog = new AccessLogMessage
                 {
                     User = accessLog.User,
+                    TenantId = accessLog.TenantId,
                     Action = accessLog.Action,
                     Datetime = accessLog.DateTime.ToTimestamp(),
                     Metadata = ByteString.FromStream(metadata),
@@ -78,7 +79,8 @@ namespace Juice.Audit.Api.Grpc.Services
                     Table = ae.Tbl,
                     KeyValues = ByteString.FromStream(kvps),
                     DataChanges = ByteString.FromStream(changes),
-                    ReqId = ae.TraceId
+                    ReqId = ae.TraceId,
+                    TenantId = ae.TenantId
                 });
             }
 

@@ -1,5 +1,7 @@
 ﻿using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.EF.Extensions;
+using Juice.EF.MultiTenant;
+using Juice.MultiTenant.EF.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -21,6 +23,7 @@ namespace Juice.Audit.EF.EntityTypeConfiguration
             builder.Property(x => x.Id).ValueGeneratedOnAdd();
             builder.Property(x => x.User).HasMaxLength(LengthConstants.NameLength);
             builder.Property(x => x.Action).HasMaxLength(LengthConstants.NameLength);
+            builder.Property(x => x.TenantId).HasMaxLength(Juice.MultiTenant.Constants.TenantIdMaxLength);
 
             builder.Property(x => x.Metadata)
                 .HasJsonConversion(_dbContext.Database.ProviderName);
@@ -62,6 +65,9 @@ namespace Juice.Audit.EF.EntityTypeConfiguration
             builder.HasIndex(x => new { x.User, x.Action });
             builder.HasIndex(x => x.DateTime);
             builder.HasIndex(x => x.IsRestricted);
+            builder.HasIndex(x => new { x.TenantId, x.DateTime });
+
+            builder.IsMultiTenant(SharingType.Global);
         }
     }
 }

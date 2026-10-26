@@ -8,6 +8,7 @@ using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Measurement;
 using Juice.Measurement.Internal;
 using Juice.Measurement.Stores;
+using Juice.MultiTenant;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -200,6 +201,14 @@ namespace Juice.Audit.AspNetCore.Middleware
                 ?? context.User.FindFirst(ClaimTypes.Name)?.Value;
         }
 
+        /// <summary>
+        /// The current tenant, if the app is multi-tenant (<see cref="ITenantAccessor"/> is registered).
+        /// </summary>
+        private string? GetTenantId(HttpContext context)
+        {
+            return context.RequestServices.GetService<ITenantAccessor>()?.Tenant?.Id;
+        }
+
         private void InitAuditContext(IAuditContextAccessor auditContextAccessor,
             HttpContext context)
         {
@@ -207,7 +216,7 @@ namespace Juice.Audit.AspNetCore.Middleware
 
             var action = StringUtils.PathToAction(path) ?? "Unknown";
 
-            auditContextAccessor.Init(action, GetUser(context));
+            auditContextAccessor.Init(action, GetUser(context), GetTenantId(context));
             context.Response.Headers.TryAdd("X-Trace-Id", GetTraceId(context));
         }
 
@@ -265,6 +274,12 @@ namespace Juice.Audit.AspNetCore.Middleware
             {
                 auditContextAccessor.AuditContext.SetUser(GetUser(context));
                 tracker.Checkpoint("SetUser");
+            }
+            // The tenant may be resolved after UseAudit() (e.g. by a route strategy), so retry here
+            if (auditContextAccessor.AuditContext.TenantId == null)
+            {
+                auditContextAccessor.AuditContext.SetTenant(GetTenantId(context));
+                tracker.Checkpoint("SetTenant");
             }
             var dict = new Dictionary<string, object>();
             try

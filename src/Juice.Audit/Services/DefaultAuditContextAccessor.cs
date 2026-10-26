@@ -11,6 +11,11 @@
             _auditContext = new AuditContext(action, user);
         }
 
+        public void Init(string action, string? user, string? tenantId)
+        {
+            _auditContext = new AuditContext(action, user, tenantId);
+        }
+
 
         #region IDisposable Support
 

@@ -16,7 +16,7 @@ namespace Juice.Audit.Api.Grpc.Services
             try
             {
                 var ral = request.AccessLog;
-                var accessLog = new Domain.AccessLogAggregate.AccessLog(ral.Action, ral.User);
+                var accessLog = new Domain.AccessLogAggregate.AccessLog(ral.Action, ral.User, ral.TenantId);
 
                 accessLog.SetRequestInfo(new Domain.AccessLogAggregate.RequestInfo(
                     ral.ReqMethod, ral.ReqPath, ral.ReqData.ToStringUtf8(), ral.ReqQuery,
@@ -66,7 +66,8 @@ namespace Juice.Audit.Api.Grpc.Services
                     new Domain.DataAuditAggregate.DataAudit(
                         ae.User, ae.Datetime.ToDateTimeOffset(),
                         ae.Action, ae.Database, ae.Schema, ae.Table,
-                        ae.KeyValues.ToStringUtf8(), ae.DataChanges.ToStringUtf8(), ae.ReqId
+                        ae.KeyValues.ToStringUtf8(), ae.DataChanges.ToStringUtf8(), ae.ReqId,
+                        ae.TenantId ?? ral.TenantId
                 )).ToArray();
 
                 var saveAuditCommand = new SaveAuditInfoCommand(accessLog, auditEntries);

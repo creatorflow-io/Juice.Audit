@@ -15,10 +15,20 @@ namespace Juice.Audit.Domain.AccessLogAggregate
             DateTime = DateTimeOffset.UtcNow;
             Response = new ResponseInfo();
         }
+        public AccessLog(string action, string? user, string? tenantId)
+            : this(action, user)
+        {
+            SetTenant(tenantId);
+        }
         public Guid Id { get; set; }
         public DateTimeOffset DateTime { get; init; }
 
         public string? User { get; private set; }
+
+        /// <summary>
+        /// The tenant the request belongs to. <c>null</c> for the root tenant or a non multi-tenant app.
+        /// </summary>
+        public string? TenantId { get; private set; }
 
         public string Action { get; private set; }
 
@@ -70,6 +80,20 @@ namespace Juice.Audit.Domain.AccessLogAggregate
 
         public void SetUser(string? user)
             => User ??= user;
+
+        /// <summary>
+        /// Set the tenant once, like <see cref="SetUser"/>: a tenant that is already set is never overwritten.
+        /// </summary>
+        public void SetTenant(string? tenantId)
+        {
+            if (TenantId != null || string.IsNullOrEmpty(tenantId))
+            {
+                return;
+            }
+            TenantId = tenantId;
+            this.NotExceededLength(TenantId, Juice.MultiTenant.Constants.TenantIdMaxLength);
+            this.ThrowIfHasErrors();
+        }
 
         public void Restricted()
         {

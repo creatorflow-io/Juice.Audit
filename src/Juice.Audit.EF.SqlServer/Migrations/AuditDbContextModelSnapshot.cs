@@ -45,6 +45,10 @@ namespace Juice.Audit.EF.SqlServer.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasDefaultValueSql("'{}'");
 
+                    b.Property<string>("TenantId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("User")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -54,6 +58,8 @@ namespace Juice.Audit.EF.SqlServer.Migrations
                     b.HasIndex("DateTime");
 
                     b.HasIndex("IsRestricted");
+
+                    b.HasIndex("TenantId", "DateTime");
 
                     b.HasIndex("User", "Action");
 
@@ -104,6 +110,10 @@ namespace Juice.Audit.EF.SqlServer.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("TenantId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("User")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -113,6 +123,8 @@ namespace Juice.Audit.EF.SqlServer.Migrations
                     b.HasIndex("DateTime");
 
                     b.HasIndex("Kvps");
+
+                    b.HasIndex("TenantId", "DateTime");
 
                     b.HasIndex("TraceId");
 
