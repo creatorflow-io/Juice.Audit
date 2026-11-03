@@ -21,12 +21,23 @@ namespace Juice.Audit.AspNetCore.Middleware
         private RequestDelegate _next;
         private string _appName;
         private AuditFilterOptions _filter;
-        private string? _action;
-        private IDictionary<string, string>? _routeValues;
 
+        /// <summary>
+        /// Set to <c>true</c> on a traced request's span when time logging matched (<c>[TimeLogging]</c> or
+        /// <see cref="AuditFilterOptions.ExecutionTimeThreshold"/>), so these requests can be found by attribute.
+        /// </summary>
+        public const string TimeLoggedTag = "juice.audit.time_logged";
+
+        /// <summary>
+        /// The W3C trace id (32 hex characters) of the request's activity, the id tracing back ends such as Juice
+        /// Observability show, so an audit record can be looked up there. Falls back to ASP.NET's request id when the
+        /// request has no W3C activity.
+        /// </summary>
         private string GetTraceId(HttpContext context)
         {
-            return Activity.Current?.Id ?? context.TraceIdentifier;
+            return Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity
+                ? activity.TraceId.ToHexString()
+                : context.TraceIdentifier;
         }
 
         public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options)
@@ -42,6 +53,8 @@ namespace Juice.Audit.AspNetCore.Middleware
             var logger = context.RequestServices.GetRequiredService<ILogger<AuditMiddleware>>();
 
             using var tracker = context.RequestServices.GetService<ITimeTracker>() ?? new TimeTracker();
+            // The request's span, captured before the tracker's scopes become the current activity.
+            var activity = Activity.Current;
             try
             {
                 InitAuditContext(auditContextAccessor, context);
@@ -58,13 +71,16 @@ namespace Juice.Audit.AspNetCore.Middleware
 
             try
             {
-                PreRequestCollectInfo(auditContextAccessor, tracker, context);
+                PreRequestCollectInfo(auditContextAccessor, tracker, context, activity);
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Error while collecting the request information");
             }
 
+            // Per request: the middleware is one instance shared by concurrent requests.
+            string? action = null;
+            IDictionary<string, string>? routeValues = null;
             bool isMatch = false;
             bool isTimeExceeded = false;
             bool isMeasureRequested = false;
@@ -85,7 +101,7 @@ namespace Juice.Audit.AspNetCore.Middleware
 
                 var isRequested = auditContextAccessor.AuditContext.IsRequestedForAccessLog(status);
                 var rule = string.Empty;
-                var isFilterMatched = _filter.IsMatch(context.Request.Path, context.Request.Method, status, out rule, out _action, out _routeValues);
+                var isFilterMatched = _filter.IsMatch(context.Request.Path, context.Request.Method, status, out rule, out action, out routeValues);
                 isMatch = isRequested
                     || auditContextAccessor.AuditContext.IsRequestedForAuditLog
                     || isTimeExceeded
@@ -112,7 +128,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 auditContextAccessor.AuditContext.AccessRecord.Metadata["TimeExceeded"] = isTimeExceeded;
                 try
                 {
-                    PostRequestColllectInfo(auditContextAccessor, context, tracker);
+                    PostRequestColllectInfo(auditContextAccessor, context, tracker, action, routeValues);
                 }
                 catch (Exception ex)
                 {
@@ -124,7 +140,7 @@ namespace Juice.Audit.AspNetCore.Middleware
                 isMatch = true;
                 try
                 {
-                    PostRequestColllectInfo(auditContextAccessor, context, tracker, ex);
+                    PostRequestColllectInfo(auditContextAccessor, context, tracker, action, routeValues, ex);
                 }
                 catch (Exception ex1)
                 {
@@ -169,20 +185,32 @@ namespace Juice.Audit.AspNetCore.Middleware
 
                 if (isTimeExceeded || isMeasureRequested)
                 {
+                    if (activity is { Recorded: true })
+                    {
+                        activity.SetTag(TimeLoggedTag, true);
+                    }
                     try
                     {
                         using var _ = tracker.BeginScope("SaveTrackData");
+                        // The time store is an optional plugin: registered only by apps that keep the records.
                         var timeRepository = context.RequestServices.GetService<ITimeRepository>();
                         _.Dispose();
+                        var actionName = auditContextAccessor.AuditContext.AccessRecord.Action;
                         if (timeRepository != null)
                         {
                             await timeRepository.SaveTrackDataAsync(tracker, GetTraceId(context),
-                                auditContextAccessor.AuditContext.AccessRecord.Action,
-                                auditContextAccessor.AuditContext.AccessRecord.Action);
+                                auditContextAccessor.AuditContext.Items.GetValueOrDefault("ScopeId") as string ?? actionName,
+                                actionName);
+                            if (logger.IsEnabled(LogLevel.Trace))
+                            {
+                                logger.LogTrace(tracker.ToString(true));
+                            }
                         }
-                        if (logger.IsEnabled(LogLevel.Trace))
+                        else if (logger.IsEnabled(LogLevel.Information))
                         {
-                            logger.LogTrace(tracker.ToString(true));
+                            // Without a store the log is where the timing goes.
+                            logger.LogInformation("Execution time of {Action}, trace {TraceId}:\n{TimeTable}",
+                                actionName, GetTraceId(context), tracker.ToString(true));
                         }
                     }
                     catch (Exception ex)
@@ -221,7 +249,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         }
 
         private void CollectRequestInfo(IAuditContextAccessor auditContextAccessor,
-            HttpContext context)
+            HttpContext context, Activity? activity)
         {
 
             var requestInfo = new RequestInfo(
@@ -240,6 +268,11 @@ namespace Juice.Audit.AspNetCore.Middleware
             ;
             
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
+            // The request's span, not a tracker scope's.
+            if (activity is { IdFormat: ActivityIdFormat.W3C })
+            {
+                auditContextAccessor.AuditContext.AccessRecord.SetMetadata("SpanId", activity.SpanId.ToHexString());
+            }
         }
 
         private void CollectServerInfo(IAuditContextAccessor auditContextAccessor)
@@ -257,17 +290,18 @@ namespace Juice.Audit.AspNetCore.Middleware
 
         private void PreRequestCollectInfo(IAuditContextAccessor auditContextAccessor,
             ITimeTracker tracker,
-            HttpContext context)
+            HttpContext context, Activity? activity)
         {
             using var _ = tracker.BeginScope("PreRequestCollectInfo");
-            CollectRequestInfo(auditContextAccessor, context);
+            CollectRequestInfo(auditContextAccessor, context, activity);
             tracker.Checkpoint("CollectRequestInfo");
             CollectServerInfo(auditContextAccessor);
             tracker.Checkpoint("CollectServerInfo");
         }
 
         private void PostRequestColllectInfo(IAuditContextAccessor auditContextAccessor,
-            HttpContext context, ITimeTracker tracker, Exception? ex = default)
+            HttpContext context, ITimeTracker tracker, string? action, IDictionary<string, string>? routeValues,
+            Exception? ex = default)
         {
             using var _ = tracker.BeginScope("PostRequestColllectInfo");
             if (auditContextAccessor.AuditContext.AccessRecord.User == null)
@@ -288,9 +322,9 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     dict = context.Request.Form.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value);
                 }
-                if (_routeValues != null)
+                if (routeValues != null)
                 {
-                    foreach (var kvp in _routeValues)
+                    foreach (var kvp in routeValues)
                     {
                         if (!dict.ContainsKey(kvp.Key))
                         {
@@ -306,9 +340,9 @@ namespace Juice.Audit.AspNetCore.Middleware
                 tracker.Checkpoint("SetFormDataFailure");
             }
 
-            if (!string.IsNullOrEmpty(_action))
+            if (!string.IsNullOrEmpty(action))
             {
-                auditContextAccessor.AuditContext.SetAction(_action);
+                auditContextAccessor.AuditContext.SetAction(action);
             }
             
             auditContextAccessor.AuditContext.UpdateResponseInfo(responseInfo =>
