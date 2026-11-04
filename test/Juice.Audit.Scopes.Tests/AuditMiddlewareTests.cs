@@ -61,6 +61,8 @@ namespace Juice.Audit.Scopes.Tests
             await invoke.Should().ThrowAsync<InvalidOperationException>();
             var saved = provider.Records().Should().ContainSingle().Subject;
             saved.AccessLog.Response!.Msg.Should().Be("no stock");
+            // The exception handler outside UseAudit() answers 500; the record says so, not the 200 it had when thrown.
+            saved.AccessLog.Response.Status.Should().Be(500);
         }
 
         [Fact]

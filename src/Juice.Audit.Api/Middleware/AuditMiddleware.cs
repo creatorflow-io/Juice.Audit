@@ -276,9 +276,13 @@ namespace Juice.Audit.AspNetCore.Middleware
                     responseInfo.TrySetMessage("Request aborted");
                 }
 
+                // An exception leaving the pipeline has not set a status yet: the exception handler outside
+                // UseAudit() (or the server) answers 500 once it unwinds, so record that rather than the 200 default.
                 var status = context.RequestAborted.IsCancellationRequested
                     ? _filter.RequestAbortedStatusCode
-                    : context.Response.StatusCode;
+                    : ex != null && !context.Response.HasStarted
+                        ? StatusCodes.Status500InternalServerError
+                        : context.Response.StatusCode;
 
                 responseInfo.SetResponseInfo(status,
                     JsonConvert.SerializeObject(context.Response.Headers
