@@ -79,6 +79,9 @@
   .ja-lookup { display: flex; align-items: center; gap: 4px; border: 1px solid var(--ja-border); border-radius: 6px; padding: 2px 8px; background: var(--ja-surface);
     input { border: 0; outline: 0; background: transparent; color: inherit; width: 260px; font: inherit; padding: 6px 0; }
     mat-icon { color: var(--ja-muted); font-size: 18px; height: 18px; width: 18px; } }
+  // The filters, the context bar and every other field the pages size label each field. An app theme denser than -1 hides a fill field's label (and
+  // these fields have no placeholder to fall back on), so keep them at -1 whatever the app's density.
+  .ja-context, .ja-filter-form, mat-form-field[class*='ja-field-'] { @include mat.form-field-density(-1); }
   .ja-filter-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 
   .ja-card { display: block; background: var(--ja-surface); border: 1px solid var(--ja-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
