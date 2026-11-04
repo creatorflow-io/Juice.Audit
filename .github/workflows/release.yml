@@ -1,0 +1,117 @@
+name: Release
+
+# Create a GitHub release on main (or on release/* to patch an older line). The tag names the package and its version
+# (no "v"); each package has its own version and is released on its own:
+#   api-10.5.0      → Juice.Audit.*     → nuget.org
+#   console-1.0.0   → @juice-js/audit   → npmjs
+# A pre-release version (api-10.5.0-beta.1, console-1.1.0-rc.1) is published as a pre-release; Juice.Audit then
+# references the Juice packages of the same stage (-beta.*, -rc.*).
+# npm dist-tag: "latest" for a release on main; "release-1.x" for a release on release/1.x (it never replaces latest);
+# for a pre-release, its label ("beta", "rc").
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      package: ${{ steps.tag.outputs.package }}
+      version: ${{ steps.tag.outputs.version }}
+      dist-tag: ${{ steps.tag.outputs.dist-tag }}
+      juice-suffix: ${{ steps.tag.outputs.juice-suffix }}
+    steps:
+      - name: Check the tag and the branch
+        id: tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ github.event.release.target_commitish }}
+        run: |
+          if ! [[ "$TAG" =~ ^(api|console)-([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+            echo "::error::The release tag must be api-<version> or console-<version>, for example api-10.5.0 or console-1.1.0-rc.1 (no 'v'), not '$TAG'"; exit 1
+          fi
+          package=${BASH_REMATCH[1]}; version=${BASH_REMATCH[2]}
+          if [[ "$TARGET" != "main" && "$TARGET" != release/* ]]; then
+            echo "::error::Release from main or a release/* branch, not '$TARGET'"; exit 1
+          fi
+          suffix=''
+          if [[ "$version" == *-* ]]; then
+            label=${version#*-}; tag=${label%%.*}
+            [[ "$tag" == beta || "$tag" == rc ]] && suffix="-$tag.*"
+          elif [[ "$TARGET" == "main" ]]; then
+            tag=latest
+          else
+            tag=${TARGET//\//-}
+          fi
+          {
+            echo "package=$package"
+            echo "version=$version"
+            echo "dist-tag=$tag"
+            echo "juice-suffix=$suffix"
+          } >> "$GITHUB_OUTPUT"
+          echo "Publishing $package $version from $TARGET; npm dist-tag $tag; Juice references ${suffix:-stable}"
+
+  # Trusted publishing: nuget.org matches its policy against this workflow file, so the push runs here.
+  # Policy: owner creatorflow-io, repository Juice.Audit, workflow file release.yml.
+  nuget:
+    needs: check
+    if: needs.check.outputs.package == 'api'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      JuiceRefSuffix: ${{ needs.check.outputs.juice-suffix }}
+      GITHUB_PACKAGE_USERNAME: ${{ github.actor }}
+      GITHUB_PACKAGE_TOKEN: ${{ secrets.GIT_HUB_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+      - run: dotnet restore --no-cache
+      - run: dotnet build --no-restore --configuration Release -p:Version=$VERSION
+      - run: dotnet test --no-build --configuration Release
+      - run: dotnet pack --no-build --configuration Release -p:Version=$VERSION -p:PackageOutputPath=$GITHUB_WORKSPACE/packages
+      - name: NuGet login
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+      - name: Push ${{ env.VERSION }} to nuget.org
+        run: dotnet nuget push "packages/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --skip-duplicate
+
+  npm:
+    needs: check
+    if: needs.check.outputs.package == 'console'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm provenance
+    defaults:
+      run:
+        working-directory: console
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - run: npm ci
+      - run: npm run build:lib
+      - name: Publish ${{ env.VERSION }}
+        working-directory: console/dist/juice-js/audit
+        run: |
+          npm version "$VERSION" --no-git-tag-version
+          npm publish --tag "${{ needs.check.outputs.dist-tag }}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

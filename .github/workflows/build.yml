@@ -1,0 +1,118 @@
+name: Build
+
+# Build and test on every working branch. On a release/* branch, once build and test pass, publish test packages of
+# each side the push changed:
+#   Juice.Audit.*      → <VersionPrefix>-alpha.<run> on GitHub Packages (nuget.pkg.github.com/creatorflow-io)
+#                        (VersionPrefix in Directory.Build.props)
+#   @juice-js/audit    → <version>-alpha.<run> on npmjs, dist-tag "alpha" (npm i @juice-js/audit@alpha)
+#                        ("version" in console/projects/juice-js/audit/package.json)
+# Run it by hand on a release/* branch to publish both. Beta and stable packages come only from a release tag
+# (release.yml).
+on:
+  push:
+    branches: [ "main", "release/**", "dev/**" ]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+jobs:
+  # Which side the push changed, for the alpha jobs. A new branch is compared with where it left main.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      nuget: ${{ steps.diff.outputs.nuget }}
+      npm: ${{ steps.diff.outputs.npm }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Changed files
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT" != push ]]; then
+            echo "nuget=true" >> "$GITHUB_OUTPUT"; echo "npm=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [[ "$BEFORE" =~ ^0+$ ]] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            BEFORE=$(git merge-base origin/main HEAD)
+          fi
+          files=$(git diff --name-only "$BEFORE" HEAD | grep -v '\.md$' || true)
+          echo "$files"
+          nuget=false; npm=false
+          grep -qE '^(src/|Directory\.Build\.props$|nuget\.config$)' <<< "$files" && nuget=true
+          grep -qE '^(console/projects/juice-js/audit/|console/package-lock\.json$)' <<< "$files" && npm=true
+          echo "nuget=$nuget" >> "$GITHUB_OUTPUT"; echo "npm=$npm" >> "$GITHUB_OUTPUT"
+          echo "Alpha NuGet: $nuget; alpha npm: $npm"
+
+  # Juice.Audit.* and the tests (the database tests skip themselves on CI). SDK 10 builds every target framework,
+  # net6.0 included; the tests run on net8.0, net9.0 and net10.0.
+  dotnet:
+    uses: creatorflow-io/shared-workflows/.github/workflows/shared-build.yml@net8
+    with:
+       Stage: alpha
+       Target: |
+          8.0.x
+          9.0.x
+          10.0.x
+    secrets: inherit
+
+  # @juice-js/audit
+  console:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+      - run: npm ci
+      - run: npm run build:lib
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: console/dist/juice-js/audit
+          retention-days: 1
+
+  alpha-nuget:
+    needs: [ changes, dotnet, console ]
+    if: startsWith(github.ref, 'refs/heads/release/') && needs.changes.outputs.nuget == 'true'
+    uses: creatorflow-io/shared-workflows/.github/workflows/shared-pack.yml@net8
+    with:
+       Stage: alpha
+       Target: |
+          8.0.x
+          9.0.x
+          10.0.x
+    secrets: inherit
+
+  alpha-npm:
+    needs: [ changes, dotnet, console ]
+    if: startsWith(github.ref, 'refs/heads/release/') && needs.changes.outputs.npm == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm provenance
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: package
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - name: Publish
+        working-directory: package
+        run: |
+          version="$(node -p "require('./package.json').version")-alpha.${{ github.run_number }}"
+          npm version "$version" --no-git-tag-version
+          echo "Publishing @juice-js/audit@$version"
+          npm publish --tag alpha
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
