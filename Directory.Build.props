@@ -10,7 +10,7 @@
     <PackageIconUrl>https://avatars.githubusercontent.com/u/107674950</PackageIconUrl>
     <RepositoryUrl>https://github.com/creatorflow-io/Juice.Audit</RepositoryUrl>
 
-    <VersionPrefix>10.5.0</VersionPrefix>
+    <VersionPrefix>10.5.1</VersionPrefix>
     <VersionSuffix>local.$([System.DateTime]::Now.ToString(`yyyyMMdd`)).1</VersionSuffix>
   </PropertyGroup>
 
@@ -71,5 +71,13 @@
     <OutputPath>$(SolutionDir)/build/bin/$(Configuration)/$(MSBuildProjectName)</OutputPath>
     <PackageLocation>$(SolutionDir)build/publish/$(Configuration)/</PackageLocation>
   </PropertyGroup>
+
+  <PropertyGroup Label="Packaging">
+    <PackageReadmeFile>README.MD</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.MD" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 
 </Project>

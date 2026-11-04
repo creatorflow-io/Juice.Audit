@@ -1,6 +1,6 @@
 {
   "name": "@juice-js/audit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Juice Audit pages (overview, access records, data changes, trace) for an Angular app on juice-layout",
   "author": "jack@creatorflow.io",
   "license": "MIT",
