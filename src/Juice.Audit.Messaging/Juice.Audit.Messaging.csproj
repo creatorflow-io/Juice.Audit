@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(AppTargetFramework)</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <Description>Audits the data changed by integration event handlers (Juice.Messaging consumers) under the message's trace id, as UseAudit() does for a request.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Juice.Audit.Api\Juice.Audit.Api.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Juice.Messaging" Version="$(JuiceMessagingVersion)" />
+    </ItemGroup>
+
+</Project>

@@ -1,7 +1,9 @@
 ﻿using Grpc.Net.ClientFactory;
 using Juice.Audit.Api.NotificationHandlers;
+using Juice.Audit.Api.Scopes;
 using Juice.EF;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection
 {
@@ -16,6 +18,41 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddDataEventHandler(this IServiceCollection services)
         {
             services.AddScoped(typeof(INotificationHandler<>), typeof(DataEvenNotificationtHandler<>));
+            return services;
+        }
+
+        /// <summary>
+        /// Opens an audit scope around mediator requests and notifications that run outside an audited HTTP request or
+        /// message: background jobs, scheduled tasks, local-channel notifications. The data they change is saved under
+        /// the current trace id, by <c>UseAudit()</c>'s rules (see <see cref="AuditScopeOptions"/>). Inside an audited
+        /// request or message they join its scope. Use with <c>ConfigureAuditDefault()</c> or
+        /// <c>ConfigureAuditGrpcClient()</c>.
+        /// </summary>
+        public static IServiceCollection AddMediatorAudit(this IServiceCollection services,
+            Action<AuditScopeOptions>? configure = default)
+        {
+            services.AddAuditScopeRunner(configure);
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IPipelineBehavior<,>), typeof(AuditRequestBehavior<,>)));
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IPipelineBehavior<>), typeof(AuditRequestBehavior<>)));
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(INotificationPipelineBehavior<>),
+                typeof(AuditNotificationBehavior<>)));
+            return services;
+        }
+
+        /// <summary>
+        /// Adds the <see cref="AuditScopeRunner"/> that opens audit scopes outside an HTTP request, for
+        /// <see cref="AddMediatorAudit"/> and <c>AddMessageAudit()</c> (Juice.Audit.Messaging). Each call's
+        /// <paramref name="configure"/> applies to the same <see cref="AuditScopeOptions"/>.
+        /// </summary>
+        public static IServiceCollection AddAuditScopeRunner(this IServiceCollection services,
+            Action<AuditScopeOptions>? configure = default)
+        {
+            services.AddOptions<AuditScopeOptions>();
+            if (configure != null)
+            {
+                services.Configure(configure);
+            }
+            services.TryAddScoped<AuditScopeRunner>();
             return services;
         }
 

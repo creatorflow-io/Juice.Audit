@@ -30,6 +30,8 @@
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
     <JuiceVersion>10.4.*$(JuiceRefSuffix)</JuiceVersion>
     <JuiceMeasurement>10.1.*$(JuiceRefSuffix)</JuiceMeasurement>
+    <!-- Juice.Audit.Messaging only: IIntegrationEventFilter is new in Juice.Messaging 10.9. -->
+    <JuiceMessagingVersion>10.9.*$(JuiceRefSuffix)</JuiceMessagingVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net10.0'">
