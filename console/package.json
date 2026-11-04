@@ -1,0 +1,32 @@
+{
+  "name": "juice-audit-console",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "build:lib": "ng build @juice-js/audit",
+    "watch:lib": "ng build @juice-js/audit --watch --configuration development"
+  },
+  "private": true,
+  "packageManager": "npm@11.19.1",
+  "dependencies": {
+    "@angular/cdk": "22.2.5",
+    "@angular/common": "^22.0.0",
+    "@angular/compiler": "^22.0.0",
+    "@angular/core": "^22.0.0",
+    "@angular/forms": "^22.0.0",
+    "@angular/material": "22.2.5",
+    "@angular/platform-browser": "^22.0.0",
+    "@angular/router": "^22.0.0",
+    "@juice-js/core": "^2.0.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.0.6",
+    "@angular/cli": "^22.0.6",
+    "@angular/compiler-cli": "^22.0.0",
+    "ng-packagr": "22.2.5",
+    "sass": "^1.93.0",
+    "typescript": "~6.0.2"
+  }
+}

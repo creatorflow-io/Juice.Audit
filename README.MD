@@ -70,3 +70,48 @@ ask for a request's timing. The steps measured by the request's `ITimeTracker` (
 When an OpenTelemetry tracer records the request, its span also gets `juice.audit.time_logged=true`; find these
 requests in the Juice Observability Console with the trace attribute filter `juice.audit.time_logged=true`. In Juice
 releases after 10.8 the tracker's scopes are spans of the request as well.
+
+## Reading the records: API and pages
+
+`MapJuiceAudit()` maps a read-only API over the audit records. The `@juice-js/audit` Angular pages
+(`console/projects/juice-js/audit`) are built on it.
+
+```csharp
+app.MapJuiceAudit("/api/audit");                 // any authenticated user (the default policy)
+app.MapJuiceAudit("/api/audit", "AuditReaders"); // or a policy of yours
+```
+
+| Endpoint | Returns |
+|---|---|
+| `GET access-logs` | access records, newest first; filters `user`, `action`, `path`, `method`, `status` (`404`, `4xx`, `error`), `app`, `tenant`, `traceId`, `minMs`, `restricted` |
+| `GET access-logs/{id}` | one record: request, response, server, metadata, and how many data changes share its trace |
+| `GET data-changes` | data changes, newest first; filters `table`, `schema`, `database`, `action`, `user`, `tenant`, `traceId`, `key` (text in the row's keys) |
+| `GET data-changes/{id}` | one change, with its `OriginalValues` and `CurrentValues` |
+| `GET traces/{traceId}` | the access records and data changes of one trace (a trace id, or a pre-10.4 `traceparent`) |
+| `GET overview` | totals, status classes, top apps, users and tables, latest failures, slowest requests |
+
+Lists and the overview take `from` and `to` (ISO 8601; the last 24 hours by default, at most 93 days). Lists also take
+`limit` (1–200, default 50) and `cursor`, the `nextCursor` of the previous page. The records are read through
+`AuditDbContext`, so a tenant sees only its own and the root tenant all of them. Map the API where that context is
+registered: in the app with `ConfigureAuditDefault()`, or on the gRPC audit server (`ConfigureAuditGrpcHost()`).
+
+## Building and releasing
+
+`build.yml` builds and tests both sides on every push to `main`, `release/**` and `dev/**`. On a `release/*` branch,
+once build and test pass, it publishes alphas of each side the push changed:
+
+| Package | Alpha | Version from |
+|---|---|---|
+| `Juice.Audit.*` | `<VersionPrefix>-alpha.<run>` on GitHub Packages | `VersionPrefix` in `Directory.Build.props` |
+| `@juice-js/audit` | `<version>-alpha.<run>` on npm, dist-tag `alpha` | `version` in `console/projects/juice-js/audit/package.json` |
+
+Run Build by hand on a `release/*` branch to publish both. Releases come from a GitHub release on `main` or a
+`release/*` branch (`release.yml`). The tag names the package and its version, without a "v":
+
+| Tag | Publishes |
+|---|---|
+| `api-10.5.0` | `Juice.Audit.*` to nuget.org (trusted publishing) |
+| `console-1.0.0` | `@juice-js/audit` to npm. Dist-tag `latest` from `main`, `release-1.x` from `release/1.x` |
+
+A pre-release version (`api-10.5.0-beta.1`, `console-1.1.0-rc.1`) is published as a pre-release, with its label as the
+npm dist-tag. A NuGet beta or rc references the Juice packages of the same stage.

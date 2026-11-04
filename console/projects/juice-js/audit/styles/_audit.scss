@@ -1,0 +1,139 @@
+// Juice Audit page styles. `@use` the module once, in the app's global styles, and the pages are styled:
+//
+//   @use '@juice-js/audit';                              // layout, and a default light and dark (.dark) theme
+//   :root { @include audit.colors($light-theme); }      // optional: colours from the app's own theme
+//   .dark { @include audit.colors($dark-theme); }       // again under the app's own dark-mode selector
+//
+// colors() writes the --ja-* custom properties the pages read, from an Angular Material (M2) theme: text, background,
+// card and divider from its background and foreground palettes; links and selection from primary; failures from warn.
+// A theme has no slot for "succeeded", "warning" or "modified", so pass those in $tones to change them.
+//
+// Without colors(), the pages use the Juice Console's teal, amber and red theme. It sits under zero-specificity
+// :where() selectors, so the app's colors() wins whatever the order. Every class and property starts with ja- /
+// --ja-, so the pages sit beside other packages' (such as @juice-js/observability's jc-) in one app.
+@use '@angular/material' as mat;
+@use 'sass:color';
+@use 'sass:map';
+@use 'sass:meta';
+
+@function _hue($palette, $light, $dark, $is-dark) {
+  @return mat.m2-get-color-from-palette($palette, if(sass($is-dark): $dark; else: $light));
+}
+
+/// The --ja-* colour properties from an Angular Material (M2) theme. Include it inside a selector: :root for the
+/// default theme, and the app's dark-mode selector (juice-layout: .dark) for the dark one.
+/// @param $theme the app's theme, from mat.m2-define-light-theme or mat.m2-define-dark-theme
+/// @param $tones optional overrides: (ok, warn, bad, info, none), each a colour; backgrounds are tinted from them
+@mixin colors($theme, $tones: ()) {
+  $config: mat.m2-get-color-config($theme);
+  $is-dark: map.get($config, is-dark);
+  $background: map.get($config, background);
+  $foreground: map.get($config, foreground);
+  $primary: map.get($config, primary);
+  $warn: map.get($config, warn);
+  $surface: map.get($background, card);
+  $tint: if(sass($is-dark): 22%; else: 14%);
+
+  $defaults: (
+    ok: _hue(mat.m2-define-palette(mat.$m2-green-palette), 800, 300, $is-dark),
+    warn: if(sass($is-dark): _hue(mat.m2-define-palette(mat.$m2-amber-palette), 300, 300, true); else: _hue(mat.m2-define-palette(mat.$m2-deep-orange-palette), 900, 900, false)),
+    bad: _hue($warn, 700, 300, $is-dark),
+    info: _hue(mat.m2-define-palette(mat.$m2-blue-palette), 700, 200, $is-dark),
+    none: map.get($foreground, secondary-text),
+  );
+  $tones: map.merge($defaults, $tones);
+
+  --ja-bg: #{map.get($background, background)};
+  --ja-surface: #{$surface};
+  --ja-border: #{map.get($foreground, divider)};
+  --ja-text: #{map.get($foreground, text)};
+  --ja-muted: #{map.get($foreground, secondary-text)};
+  --ja-accent: #{_hue($primary, 700, 200, $is-dark)};
+  --ja-select: #{color.mix(_hue($primary, 500, 300, $is-dark), $surface, $tint)};
+  @each $name, $value in $tones {
+    @if meta.type-of($value) == color and color.alpha($value) < 1 {
+      // Foreground palette entries are translucent: flatten them on the surface so the tint below is solid.
+      $value: color.mix(color.change($value, $alpha: 1), $surface, color.alpha($value) * 100%);
+    }
+    --ja-#{$name}: #{$value};
+    --ja-#{$name}-bg: #{color.mix($value, $surface, $tint)};
+  }
+}
+
+@mixin _layout() {
+  .ja-muted { color: var(--ja-muted); }
+  .ja-small { font-size: 12px; }
+  .ja-mono { font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; }
+  .ja-nowrap { white-space: nowrap; }
+  .ja-error, .ja-bad { color: var(--ja-bad); }
+  .ja-warn { color: var(--ja-warn); }
+  .ja-spacer { flex: 1; }
+  .ja-notice { padding: 8px 12px; border-left: 3px solid var(--ja-warn); background: var(--ja-warn-bg); font-size: 13px; }
+  .ja-more { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 13px; }
+
+  .ja-context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 4px 0 12px; border-bottom: 1px solid var(--ja-border); margin-bottom: 12px; }
+  .ja-h-id { font-size: 15px; font-weight: 400; word-break: break-all; }
+  .ja-crumb { color: var(--ja-muted); }
+  .ja-field-xs { width: 130px; }
+  .ja-field-sm { width: 170px; }
+  .ja-lookup { display: flex; align-items: center; gap: 4px; border: 1px solid var(--ja-border); border-radius: 6px; padding: 2px 8px; background: var(--ja-surface);
+    input { border: 0; outline: 0; background: transparent; color: inherit; width: 260px; font: inherit; padding: 6px 0; }
+    mat-icon { color: var(--ja-muted); font-size: 18px; height: 18px; width: 18px; } }
+  .ja-filter-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+  .ja-card { display: block; background: var(--ja-surface); border: 1px solid var(--ja-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+  .ja-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ja-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 12px; }
+  .ja-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .ja-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  a.ja-tile { display: flex; flex-direction: column; gap: 4px; color: inherit; text-decoration: none; strong { font-size: 24px; } }
+  a.ja-tile:hover { border-color: var(--ja-accent); text-decoration: none; }
+  .ja-summary { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+
+  .ja-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  @each $tone in (ok, warn, bad, info, none) {
+    .ja-tone-#{$tone} { background: var(--ja-#{$tone}-bg); color: var(--ja-#{$tone}); }
+    .ja-fill-#{$tone} { background: var(--ja-#{$tone}); }
+  }
+
+  .ja-table { width: 100%; border-collapse: collapse; background: var(--ja-surface); font-size: 13px; margin-bottom: 8px;
+    th { text-align: left; font-weight: 500; color: var(--ja-muted); padding: 6px 8px; border-bottom: 1px solid var(--ja-border); white-space: nowrap; }
+    td { padding: 6px 8px; border-bottom: 1px solid var(--ja-border); vertical-align: top; } }
+  .ja-bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--ja-accent); opacity: .5; margin-right: 6px; vertical-align: middle; }
+  .ja-external { margin-left: 6px; font-size: 12px; }
+
+  .ja-diff { th { width: 28%; word-break: break-all; color: var(--ja-text); font-weight: 400; }
+    td { width: 36%; word-break: break-word; white-space: pre-wrap; }
+    tr:not(.ja-changed) { color: var(--ja-muted); th { color: var(--ja-muted); } }
+    .ja-old { background: var(--ja-bad-bg); }
+    .ja-new { background: var(--ja-ok-bg); } }
+
+  .ja-kv { width: 100%; border-collapse: collapse; font-size: 13px;
+    th { text-align: left; color: var(--ja-muted); font-weight: 400; padding: 3px 8px 3px 0; vertical-align: top; width: 35%; word-break: break-all; }
+    td { padding: 3px 0; word-break: break-word; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; } }
+  .ja-pre { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; max-height: 20em; overflow: auto;
+    background: var(--ja-bg); border: 1px solid var(--ja-border); border-radius: 4px; padding: 6px 8px; }
+
+  .ja-count { display: grid; grid-template-columns: minmax(0, 40%) 1fr max-content; gap: 8px; align-items: center; padding: 3px 0; font-size: 13px;
+    > a, > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  .ja-count-bar { height: 8px; background: var(--ja-bg); border-radius: 4px; overflow: hidden;
+    i { display: block; height: 100%; border-radius: 4px; opacity: .75; } }
+
+  @media (max-width: 700px) {
+    .ja-grid-2, .ja-grid-3 { grid-template-columns: 1fr; }
+    .ja-lookup input { width: 160px; }
+  }
+}
+
+// ─── Emitted once, on @use: the layout, and the default colours ───
+
+@include _layout();
+
+// The Juice Console's own theme: teal, amber and red.
+$_accent: mat.m2-define-palette(mat.$m2-amber-palette);
+$_warn: mat.m2-define-palette(mat.$m2-red-palette);
+
+:where(:root) { @include colors(mat.m2-define-light-theme((color: (
+  primary: mat.m2-define-palette(mat.$m2-teal-palette, 700), accent: $_accent, warn: $_warn)))); }
+:where(.dark) { @include colors(mat.m2-define-dark-theme((color: (
+  primary: mat.m2-define-palette(mat.$m2-teal-palette, 300), accent: $_accent, warn: $_warn)))); }
