@@ -41,7 +41,7 @@ import { AccessLogTable, AuditContextBar } from '../shared/ui';
         </mat-select>
       </mat-form-field>
       <mat-form-field subscriptSizing="dynamic" class="ja-field-sm"><mat-label>App</mat-label><input matInput name="app" [(ngModel)]="form().app"></mat-form-field>
-      <mat-form-field subscriptSizing="dynamic" class="ja-field-xs"><mat-label>Slower than (ms)</mat-label><input matInput type="number" min="0" name="minMs" [(ngModel)]="form().minMs"></mat-form-field>
+      <mat-form-field subscriptSizing="dynamic" class="ja-field-sm"><mat-label>Slower than (ms)</mat-label><input matInput type="number" min="0" name="minMs" [(ngModel)]="form().minMs"></mat-form-field>
       <mat-checkbox name="restricted" [(ngModel)]="form().restricted">Restricted only</mat-checkbox>
       <button mat-flat-button type="submit">Search</button>
       @if (filtered()) { <button mat-button type="button" (click)="clear()">Clear</button> }
