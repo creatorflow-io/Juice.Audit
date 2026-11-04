@@ -1,13 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Reflection;
 using System.Security.Claims;
 using Grpc.Core;
 using Juice.Audit.Api.Extensions;
+using Juice.Audit.Api.Scopes;
 using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Measurement;
 using Juice.Measurement.Internal;
-using Juice.Measurement.Stores;
 using Juice.MultiTenant;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,11 +33,7 @@ namespace Juice.Audit.AspNetCore.Middleware
         /// request has no W3C activity.
         /// </summary>
         private string GetTraceId(HttpContext context)
-        {
-            return Activity.Current is { IdFormat: ActivityIdFormat.W3C } activity
-                ? activity.TraceId.ToHexString()
-                : context.TraceIdentifier;
-        }
+            => AuditRecorder.TraceId(Activity.Current, context.TraceIdentifier);
 
         public AuditMiddleware(RequestDelegate next, string appName, AuditFilterOptions options)
         {
@@ -120,12 +115,8 @@ namespace Juice.Audit.AspNetCore.Middleware
                 {
                     return;
                 }
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["FilterMatched"] = isFilterMatched;
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["FilterRule"] = rule;
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["AccessLogRequest"] = isRequested;
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["DataAuditRequest"] = auditContextAccessor.AuditContext.IsRequestedForAuditLog;
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["MeasureRequested"] = isMeasureRequested;
-                auditContextAccessor.AuditContext.AccessRecord.Metadata["TimeExceeded"] = isTimeExceeded;
+                AuditRecorder.SetReasons(auditContextAccessor.AuditContext, isFilterMatched, rule, isRequested,
+                    isMeasureRequested, isTimeExceeded);
                 try
                 {
                     PostRequestColllectInfo(auditContextAccessor, context, tracker, action, routeValues);
@@ -152,71 +143,13 @@ namespace Juice.Audit.AspNetCore.Middleware
             {
                 if (isMatch)
                 {
-                    try
-                    {
-                        using var _ = tracker.BeginScope("SaveAuditData");
-                        var auditService = context.RequestServices.GetService<IAuditService>();
-                        tracker.Checkpoint("GetAuditService");
-
-                        if (auditService != null)
-                        {
-                            var rs = await auditService.PersistAuditInformationAsync(auditContextAccessor.AuditContext.AccessRecord,
-                                auditContextAccessor.AuditContext.AuditEntries.ToArray(), default);
-                            if (!rs.Succeeded)
-                            {
-                                logger.LogWarning("Error while saving audit information. {0}", rs.ToString());
-                                if (logger.IsEnabled(LogLevel.Trace))
-                                {
-                                    logger.LogTrace(rs.StackTrace);
-                                }
-                            }
-                            tracker.Checkpoint("Persist");
-                        }
-                        else if (logger.IsEnabled(LogLevel.Debug))
-                        {
-                            logger.LogDebug("AuditMiddleware.InvokeAsync: Skip PersistAuditInformation because IAuditService is not registered.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, $"Error while saving audit information");
-                    }
+                    await AuditRecorder.PersistAsync(context.RequestServices, auditContextAccessor.AuditContext, tracker, logger);
                 }
 
                 if (isTimeExceeded || isMeasureRequested)
                 {
-                    if (activity is { Recorded: true })
-                    {
-                        activity.SetTag(TimeLoggedTag, true);
-                    }
-                    try
-                    {
-                        using var _ = tracker.BeginScope("SaveTrackData");
-                        // The time store is an optional plugin: registered only by apps that keep the records.
-                        var timeRepository = context.RequestServices.GetService<ITimeRepository>();
-                        _.Dispose();
-                        var actionName = auditContextAccessor.AuditContext.AccessRecord.Action;
-                        if (timeRepository != null)
-                        {
-                            await timeRepository.SaveTrackDataAsync(tracker, GetTraceId(context),
-                                auditContextAccessor.AuditContext.Items.GetValueOrDefault("ScopeId") as string ?? actionName,
-                                actionName);
-                            if (logger.IsEnabled(LogLevel.Trace))
-                            {
-                                logger.LogTrace(tracker.ToString(true));
-                            }
-                        }
-                        else if (logger.IsEnabled(LogLevel.Information))
-                        {
-                            // Without a store the log is where the timing goes.
-                            logger.LogInformation("Execution time of {Action}, trace {TraceId}:\n{TimeTable}",
-                                actionName, GetTraceId(context), tracker.ToString(true));
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogWarning(ex, "Error while saving execution time trace data");
-                    }
+                    await AuditRecorder.SaveTimeAsync(context.RequestServices, auditContextAccessor.AuditContext, tracker,
+                        activity, GetTraceId(context), logger);
                 }
             }
 
@@ -268,25 +201,11 @@ namespace Juice.Audit.AspNetCore.Middleware
             ;
             
             auditContextAccessor.AuditContext.SetRequestInfo(requestInfo);
-            // The request's span, not a tracker scope's.
-            if (activity is { IdFormat: ActivityIdFormat.W3C })
-            {
-                auditContextAccessor.AuditContext.AccessRecord.SetMetadata("SpanId", activity.SpanId.ToHexString());
-            }
+            AuditRecorder.SetSpanId(auditContextAccessor.AuditContext, activity);
         }
 
         private void CollectServerInfo(IAuditContextAccessor auditContextAccessor)
-        {
-            var assembly = Assembly.GetEntryAssembly();
-            FileVersionInfo? fvi = assembly != null ? FileVersionInfo.GetVersionInfo(assembly.Location) : default;
-            var serverInfo = new ServerInfo(
-                Environment.MachineName,
-                Environment.OSVersion.ToString(),
-                fvi?.ProductVersion ?? assembly?.GetName()?.Version?.ToString(),
-                _appName
-                );
-            auditContextAccessor.AuditContext.SetServerInfo(serverInfo);
-        }
+            => auditContextAccessor.AuditContext.SetServerInfo(AuditRecorder.CreateServerInfo(_appName));
 
         private void PreRequestCollectInfo(IAuditContextAccessor auditContextAccessor,
             ITimeTracker tracker,

@@ -6,6 +6,14 @@
 
         private AuditContext? _auditContext;
 
+        public bool IsInitialized => _auditContext != null;
+
+        public void Reset()
+        {
+            _auditContext?.Dispose();
+            _auditContext = null;
+        }
+
         public void Init(string action, string? user)
         {
             _auditContext = new AuditContext(action, user);
