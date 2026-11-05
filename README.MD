@@ -77,8 +77,12 @@ filter, a scope that changed nothing saves nothing.
 A data change with no scope open (an app without these scopes) is skipped. Earlier versions threw there: the change was
 lost with a `[DispatchAuditEvents] Error` warning, and the rest of that save's changes were not audited either.
 
-Changes are reported before the transaction commits, so a record of a failed request, command or message can list
-changes that were rolled back.
+A change made inside a transaction managed by Juice's `TransactionBehavior` is saved only if the transaction commits.
+Otherwise it is dropped: the record of the attempt is still saved, with the number of dropped changes in its metadata
+(`UncommittedChanges`). A transaction the app opens itself is not tracked: its changes are saved even if it rolls back.
+
+A data change with no user of its own (a DbContext knows one only through `IHttpContextAccessor`) takes the user of its
+scope.
 
 ## Time logging
 

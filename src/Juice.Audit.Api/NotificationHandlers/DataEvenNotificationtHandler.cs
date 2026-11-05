@@ -32,8 +32,9 @@ namespace Juice.Audit.Api.NotificationHandlers
             var auditRecord = notification.AuditRecord;
             if (auditRecord != null)
             {
-                _auditContextAccessor.AuditContext.AddAuditEntries(new Domain.DataAuditAggregate.DataAudit(
-                    auditRecord.User,
+                var entry = new Domain.DataAuditAggregate.DataAudit(
+                    // A DbContext knows the user only through IHttpContextAccessor; the scope always does.
+                    auditRecord.User ?? _auditContextAccessor.AuditContext.AccessRecord.User,
                     DateTimeOffset.UtcNow,
                     notification.Name,
                     auditRecord.Database,
@@ -43,7 +44,15 @@ namespace Juice.Audit.Api.NotificationHandlers
                     JsonConvert.SerializeObject(new { auditRecord.OriginalValues, auditRecord.CurrentValues }),
                     _auditContextAccessor.AuditContext.AccessRecord.TraceId,
                     notification.TenantId ?? _auditContextAccessor.AuditContext.TenantId
-                    ));
+                    );
+                if (notification.TransactionId is { } transactionId)
+                {
+                    _auditContextAccessor.AuditContext.AddUncommittedAuditEntries(transactionId, entry);
+                }
+                else
+                {
+                    _auditContextAccessor.AuditContext.AddAuditEntries(entry);
+                }
             }
             return ValueTask.CompletedTask;
         }

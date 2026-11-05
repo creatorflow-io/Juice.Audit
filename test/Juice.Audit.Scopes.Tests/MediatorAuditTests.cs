@@ -61,6 +61,19 @@ namespace Juice.Audit.Scopes.Tests
         }
 
         [Fact]
+        public async Task Change_without_a_user_takes_the_user_of_its_scope_Async()
+        {
+            using var provider = Build(mediatorAudit: true);
+            using var scope = provider.CreateScope();
+            var accessor = scope.ServiceProvider.GetRequiredService<IAuditContextAccessor>();
+            accessor.Init("orders_pay", "alice");
+
+            await scope.ServiceProvider.GetRequiredService<IMediator>().Send(new ChangeOrder());
+
+            accessor.AuditContext.AuditEntries.Should().ContainSingle().Which.User.Should().Be("alice");
+        }
+
+        [Fact]
         public async Task Failed_command_is_saved_with_the_error_Async()
         {
             using var provider = Build(mediatorAudit: true);

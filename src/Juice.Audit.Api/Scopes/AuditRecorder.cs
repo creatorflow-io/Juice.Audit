@@ -66,6 +66,10 @@ namespace Juice.Audit.Api.Scopes
             try
             {
                 using var _ = tracker.BeginScope("SaveAuditData");
+                if (auditContext.UncommittedAuditEntryCount > 0)
+                {
+                    auditContext.AccessRecord.Metadata["UncommittedChanges"] = auditContext.UncommittedAuditEntryCount;
+                }
                 var auditService = services.GetService<IAuditService>();
                 tracker.Checkpoint("GetAuditService");
 

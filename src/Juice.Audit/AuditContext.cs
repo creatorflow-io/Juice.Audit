@@ -18,7 +18,16 @@ namespace Juice.Audit
         private bool _requestAccessLog;
         private int[] _requestAccessLogHttpStatusCodes = Array.Empty<int>();
 
-        public bool IsRequestedForAuditLog => AuditEntries.Count > 0;
+        public bool IsRequestedForAuditLog => AuditEntries.Count > 0 || UncommittedAuditEntryCount > 0;
+
+        /// <summary>
+        /// Changes reported inside a transaction, held until it commits. Those still here when the scope ends were never
+        /// committed: they are not saved, but the attempt is still recorded.
+        /// </summary>
+        private readonly Dictionary<Guid, List<DataAudit>> _uncommittedEntries = new();
+
+        public int UncommittedAuditEntryCount => _uncommittedEntries.Values.Sum(entries => entries.Count);
+
         public Version? Version => Assembly.GetEntryAssembly()?.GetName().Version;
         public AccessLog AccessRecord { get; private set; }
         public List<DataAudit> AuditEntries { get; private set; } = new();
@@ -55,6 +64,25 @@ namespace Juice.Audit
         public void AddAuditEntries(params DataAudit[] auditEntries)
             => AuditEntries.AddRange(auditEntries);
 
+        /// <summary>Holds changes made inside a transaction until <see cref="CommitAuditEntries"/>.</summary>
+        public void AddUncommittedAuditEntries(Guid transactionId, params DataAudit[] auditEntries)
+        {
+            if (!_uncommittedEntries.TryGetValue(transactionId, out var entries))
+            {
+                _uncommittedEntries[transactionId] = entries = new();
+            }
+            entries.AddRange(auditEntries);
+        }
+
+        /// <summary>The transaction committed: its changes join <see cref="AuditEntries"/>.</summary>
+        public void CommitAuditEntries(Guid transactionId)
+        {
+            if (_uncommittedEntries.Remove(transactionId, out var entries))
+            {
+                AuditEntries.AddRange(entries);
+            }
+        }
+
         public void RequestAccessLog(params int[] statusCodes)
         {
             _requestAccessLog = true;
@@ -88,6 +116,7 @@ namespace Juice.Audit
                 {
                     // dispose managed state (managed objects).
                     AuditEntries.Clear();
+                    _uncommittedEntries.Clear();
                     Items.Clear();
                     _requestAccessLogHttpStatusCodes = Array.Empty<int>();
                 }

@@ -1,6 +1,7 @@
 ﻿using Grpc.Net.ClientFactory;
 using Juice.Audit.Api.NotificationHandlers;
 using Juice.Audit.Api.Scopes;
+using Juice.Domain.Events;
 using Juice.EF;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -18,6 +19,7 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddDataEventHandler(this IServiceCollection services)
         {
             services.AddScoped(typeof(INotificationHandler<>), typeof(DataEvenNotificationtHandler<>));
+            services.AddScoped<INotificationHandler<TransactionCommitted>, TransactionCommittedHandler>();
             return services;
         }
 

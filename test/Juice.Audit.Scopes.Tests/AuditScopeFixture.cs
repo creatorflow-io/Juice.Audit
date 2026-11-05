@@ -48,7 +48,7 @@ namespace Juice.Audit.Scopes.Tests
         public static List<Saved> Records(this IServiceProvider provider) => provider.GetRequiredService<SavedAudits>().Records;
 
         /// <summary>The change a DbContext reports on SaveChanges.</summary>
-        public static ValueTask ChangeAsync(IMediator mediator, string status = "Paid")
+        public static ValueTask ChangeAsync(IMediator mediator, string status = "Paid", Guid? transactionId = null)
         {
             var change = new AuditEvent<Order>("Modified");
             change.SetAuditRecord(new AuditRecord("Orders")
@@ -56,6 +56,7 @@ namespace Juice.Audit.Scopes.Tests
                 KeyValues = { ["Id"] = 1 },
                 CurrentValues = { ["Status"] = status }
             });
+            change.SetTransactionId(transactionId);
             return mediator.Publish(change);
         }
 

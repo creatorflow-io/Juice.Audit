@@ -10,7 +10,7 @@
     <PackageIconUrl>https://avatars.githubusercontent.com/u/107674950</PackageIconUrl>
     <RepositoryUrl>https://github.com/creatorflow-io/Juice.Audit</RepositoryUrl>
 
-    <VersionPrefix>10.5.1</VersionPrefix>
+    <VersionPrefix>10.6.0</VersionPrefix>
     <VersionSuffix>local.$([System.DateTime]::Now.ToString(`yyyyMMdd`)).1</VersionSuffix>
   </PropertyGroup>
 
@@ -28,10 +28,10 @@
     <XUnitRunnerVersion>3.*</XUnitRunnerVersion>
     <TestSdk>17.13.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
-    <JuiceVersion>10.4.*$(JuiceRefSuffix)</JuiceVersion>
+    <JuiceVersion>10.10.*$(JuiceRefSuffix)</JuiceVersion>
     <JuiceMeasurement>10.1.*$(JuiceRefSuffix)</JuiceMeasurement>
-    <!-- Juice.Audit.Messaging only: IIntegrationEventFilter is new in Juice.Messaging 10.9. -->
-    <JuiceMessagingVersion>10.9.*$(JuiceRefSuffix)</JuiceMessagingVersion>
+    <!-- Juice.Audit.Messaging only: IIntegrationEventPipelineBehavior is new in Juice.Messaging 10.9. -->
+    <JuiceMessagingVersion>10.10.*$(JuiceRefSuffix)</JuiceMessagingVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net10.0'">
