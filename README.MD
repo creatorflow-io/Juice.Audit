@@ -1,5 +1,27 @@
 # Juice.Audit
 
+## What `UseAudit()` records
+
+By default, an access log is recorded for:
+
+- POST, PUT, PATCH and DELETE requests (`AuditFilterOptions.DefaultMethods`);
+- any request whose action or page is marked `[AccessLogging]`, or that asks for one in code
+  (`IAuditContextAccessor.AuditContext.RequestAccessLog()`), optionally only for the given status codes and, with
+  `[AccessLogging(Methods = new[] { "GET" })]`, only for the given HTTP methods;
+- any request that changed audited data, threw an exception, or ran past a time threshold (`[TimeLogging]`,
+  `ExecutionTimeThreshold`).
+
+Other requests, GETs included, are not recorded. Rules added in `UseAudit(appName, options => ...)` take precedence
+over the default one; `options.Clear()` drops it, and with no rules at all every request is recorded.
+
+```csharp
+app.UseAudit("billing-api", options =>
+{
+    options.Include("/reports", "GET");     // also record report reads
+    options.Exclude("/#/negotiate");        // never record SignalR negotiation
+});
+```
+
 ## Trace id
 
 Every access log (`Req_TraceId`) and data change (`TraceId`) records the W3C trace id of the request that wrote it:

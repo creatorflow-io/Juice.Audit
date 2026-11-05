@@ -6,6 +6,21 @@ namespace Juice.Audit.AspNetCore.Middleware
 {
     public class AuditFilterOptions
     {
+        /// <summary>
+        /// The HTTP methods <c>UseAudit()</c> records by default: the ones that change state. Other requests are
+        /// recorded only when asked (<c>[AccessLogging]</c>, <c>AuditContext.RequestAccessLog()</c>), when they changed
+        /// data, failed with an exception, or ran past a time threshold.
+        /// </summary>
+        public static readonly string[] DefaultMethods = { "POST", "PUT", "PATCH", "DELETE" };
+
+        /// <summary>
+        /// The options <c>UseAudit()</c> starts from: one rule including <see cref="DefaultMethods"/> on every path.
+        /// Rules added after it take precedence; <see cref="Clear"/> removes it, and with no rules at all every
+        /// request is recorded.
+        /// </summary>
+        public static AuditFilterOptions CreateDefault()
+            => new AuditFilterOptions().Include(string.Empty, DefaultMethods);
+
         public int? ExecutionTimeThreshold { get; set; }
         public int RequestAbortedStatusCode { get; set; } = 408;
         public PathFilterEntry[] Filters { get; set; } = Array.Empty<PathFilterEntry>();

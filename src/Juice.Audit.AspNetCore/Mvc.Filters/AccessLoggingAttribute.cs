@@ -19,7 +19,9 @@ namespace Juice.Audit.AspNetCore.Mvc.Filters
         /// </summary>
         private int[] _statusCodes;
         /// <summary>
-        /// The methods that will trigger the access log, applicable only for page.
+        /// The HTTP methods that will trigger the access log, compared ignoring case; empty (the default) for any.
+        /// Mostly for a page or controller, where one attribute covers handlers for several methods:
+        /// <c>[AccessLogging(Methods = new[] { "GET" })]</c> on a page model records its <c>OnGet</c> only.
         /// </summary>
         public string[] Methods { get; set; } = Array.Empty<string>();
         public AccessLoggingAttribute(params int[] statusCodes)
@@ -27,10 +29,18 @@ namespace Juice.Audit.AspNetCore.Mvc.Filters
             _statusCodes = statusCodes;
         }
 
+        private bool IsMethodMatch(string method)
+            => Methods.Length == 0 || Methods.Contains(method, System.StringComparer.OrdinalIgnoreCase);
+
         private void RequestAccessLog(HttpContext context)
         {
+            if (!IsMethodMatch(context.Request.Method))
+            {
+                return;
+            }
             var contextAccessor = context.RequestServices.GetService<IAuditContextAccessor>();
-            if (contextAccessor != null)
+            // Not initialized when the app has no UseAudit(), or this request is outside it: nothing to record.
+            if (contextAccessor != null && contextAccessor.IsInitialized)
             {
                 contextAccessor.AuditContext.RequestAccessLog(_statusCodes);
                 if (!string.IsNullOrEmpty(Name))

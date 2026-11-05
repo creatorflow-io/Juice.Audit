@@ -75,14 +75,105 @@ namespace Juice.Audit.Scopes.Tests
             provider.Records().Should().BeEmpty();
         }
 
+        [Theory]
+        [InlineData("POST")]
+        [InlineData("PUT")]
+        [InlineData("PATCH")]
+        [InlineData("DELETE")]
+        public async Task Default_records_state_changing_requests_Async(string method)
+        {
+            using var provider = Build();
+
+            await InvokeAsync(provider, method, "/orders/1", _ => Task.CompletedTask, defaults: true);
+
+            provider.Records().Should().ContainSingle()
+                .Which.AccessLog.Request!.Method.Should().Be(method);
+        }
+
+        [Theory]
+        [InlineData("GET")]
+        [InlineData("HEAD")]
+        [InlineData("OPTIONS")]
+        public async Task Default_skips_other_requests_Async(string method)
+        {
+            using var provider = Build();
+
+            await InvokeAsync(provider, method, "/orders/1", _ => Task.CompletedTask, defaults: true);
+
+            provider.Records().Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task Default_records_a_get_asked_for_in_code_Async()
+        {
+            using var provider = Build();
+
+            // What [AccessLogging] does from its action or page filter.
+            await InvokeAsync(provider, "GET", "/orders/1", c =>
+            {
+                c.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext.RequestAccessLog();
+                return Task.CompletedTask;
+            }, defaults: true);
+
+            provider.Records().Should().ContainSingle();
+        }
+
+        [Fact]
+        public async Task Default_skips_a_get_whose_status_was_not_asked_for_Async()
+        {
+            using var provider = Build();
+
+            await InvokeAsync(provider, "GET", "/orders/1", c =>
+            {
+                c.RequestServices.GetRequiredService<IAuditContextAccessor>().AuditContext.RequestAccessLog(403);
+                return Task.CompletedTask;
+            }, defaults: true);
+
+            provider.Records().Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task Default_records_a_failed_get_Async()
+        {
+            using var provider = Build();
+
+            var invoke = () => InvokeAsync(provider, "GET", "/orders/1", _ => throw new InvalidOperationException("boom"),
+                defaults: true);
+
+            await invoke.Should().ThrowAsync<InvalidOperationException>();
+            provider.Records().Should().ContainSingle().Which.AccessLog.Response!.Status.Should().Be(500);
+        }
+
+        [Fact]
+        public async Task Default_exclusion_wins_over_the_default_rule_Async()
+        {
+            using var provider = Build();
+
+            await InvokeAsync(provider, "POST", "/orders/negotiate", _ => Task.CompletedTask,
+                o => o.Exclude("/orders/negotiate"), defaults: true);
+
+            provider.Records().Should().BeEmpty();
+        }
+
+        [Fact]
+        public async Task Cleared_default_records_every_request_Async()
+        {
+            using var provider = Build();
+
+            await InvokeAsync(provider, "GET", "/orders/1", _ => Task.CompletedTask, o => o.Clear(), defaults: true);
+
+            provider.Records().Should().ContainSingle();
+        }
+
         private static async Task<HttpContext> InvokeAsync(ServiceProvider provider, string method, string path,
-            RequestDelegate next, Action<AuditFilterOptions>? configure = default)
+            RequestDelegate next, Action<AuditFilterOptions>? configure = default, bool defaults = false)
         {
             using var scope = provider.CreateScope();
             var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
             context.Request.Method = method;
             context.Request.Path = path;
-            var options = new AuditFilterOptions();
+            // defaults: what UseAudit() starts from; otherwise no rules, which records every request.
+            var options = defaults ? AuditFilterOptions.CreateDefault() : new AuditFilterOptions();
             configure?.Invoke(options);
             await new AuditMiddleware(next, "orders-api", options).InvokeAsync(context);
             return context;
