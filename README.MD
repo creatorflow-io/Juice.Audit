@@ -141,3 +141,7 @@ Run Build by hand on a `release/*` branch to publish both. Releases come from a 
 
 A pre-release version (`api-10.5.0-beta.1`, `console-1.1.0-rc.1`) is published as a pre-release, with its label as the
 npm dist-tag. A NuGet beta or rc references the Juice packages of the same stage.
+
+## License
+
+[MIT](LICENSE)
