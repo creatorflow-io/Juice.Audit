@@ -3,7 +3,9 @@
 The Juice Audit pages for an Angular app built on `@juice-js/layout`:
 - **Overview:** totals, failures, users, apps and changed tables over a time window.
 - **Access records:** the audited requests, messages and jobs, with each one's request, response, server and metadata.
+  Headers the collector masked and fields it cut (Juice.Audit 10.7) are noted where they appear.
 - **Data changes:** each changed row's values before and after, and its history.
+  A change too large to store whole shows the start that was kept.
 - **Trace:** everything audited under one trace id.
 
 The pages read the audit API that `Juice.Audit.Api` maps with `MapJuiceAudit()`.

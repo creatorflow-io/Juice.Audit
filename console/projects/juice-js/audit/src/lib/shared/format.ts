@@ -68,3 +68,52 @@ export function problemText(error: unknown): string {
   if (e.status === 401 || e.status === 403) return 'You are not allowed to read the audit records.';
   return [e.error?.title, e.error?.detail].filter(Boolean).join(': ') || `Request failed (${e.status}).`;
 }
+
+/** 512 B, 1.5 KB, 2.3 MB. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * A data change too large to keep whole, as the audit app or collector stores it (Juice.Audit 10.7):
+ * `{ "$truncated": true, "$originalSize": bytes, "$partial": "the start of the JSON" }`. `null` for a whole change.
+ */
+export interface TruncatedChange { originalSize: number | null; partial: string; }
+
+export function truncatedChange(changes: JsonValue | undefined): TruncatedChange | null {
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes) || changes['$truncated'] !== true) return null;
+  const size = changes['$originalSize'];
+  const partial = changes['$partial'];
+  return { originalSize: typeof size === 'number' ? size : null, partial: typeof partial === 'string' ? partial : '' };
+}
+
+/** What the collector did to an access record (Juice.Audit 10.7), from its metadata. */
+export interface CollectorNotes {
+  /** Headers whose values the collector masked. */
+  redacted: string[];
+  /** Fields the collector cut, by their metadata name (`Req_Data`, `Res_Data`, `Res_Err`), with their length before. */
+  truncated: Record<string, number>;
+}
+
+/** The metadata keys the collector writes; shown with the request and response, not in the metadata table. */
+export const COLLECTOR_METADATA_KEYS = ['Redacted', 'Truncated'];
+
+export function collectorNotes(metadata: Record<string, string | null> | null | undefined): CollectorNotes {
+  const notes: CollectorNotes = { redacted: [], truncated: {} };
+  const redacted = parseJson(metadata?.['Redacted']);
+  if (Array.isArray(redacted)) notes.redacted = redacted.filter((h): h is string => typeof h === 'string');
+  const truncated = parseJson(metadata?.['Truncated']);
+  if (truncated && typeof truncated === 'object' && !Array.isArray(truncated)) {
+    for (const [field, length] of Object.entries(truncated)) {
+      if (typeof length === 'number') notes.truncated[field] = length;
+    }
+  }
+  return notes;
+}
+
+function parseJson(text: string | null | undefined): JsonValue | undefined {
+  if (!text) return undefined;
+  try { return JSON.parse(text) as JsonValue; } catch { return undefined; }
+}

@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 import { AuditApiService } from '../core/api.service';
 import { AuditContextService } from '../core/context.service';
 import { AuditLinkPipe } from '../core/options';
-import { DurationPipe, PrettyJsonPipe, problemText } from '../shared/format';
+import { COLLECTOR_METADATA_KEYS, DurationPipe, PrettyJsonPipe, collectorNotes, problemText } from '../shared/format';
 import { AuditContextBar, DataChangeTable, KeyValueTable, StatusBadge, TraceRef } from '../shared/ui';
 
 /** One access record: the request, its outcome, where it ran, its metadata and the data it changed. */
@@ -32,6 +32,9 @@ import { AuditContextBar, DataChangeTable, KeyValueTable, StatusBadge, TraceRef 
         @if (l.isRestricted) { <span class="ja-badge ja-tone-warn">restricted</span> }
         <span class="ja-muted">trace <ja-trace-ref [traceId]="l.traceId" [short]="false" /></span>
       </div>
+      @if (notes().redacted.length > 0) {
+        <p class="ja-muted ja-small">The collector masked the values of these headers: {{ notes().redacted.join(', ') }}.</p>
+      }
       <div class="ja-grid-2">
         <section class="ja-card">
           <h2>Request</h2>
@@ -40,6 +43,7 @@ import { AuditContextBar, DataChangeTable, KeyValueTable, StatusBadge, TraceRef 
             <ja-kv [values]="{ 'Remote IP': r.remoteIp, 'Access zone': r.zone }" empty="" />
             @if (r.headers) { <h3>Headers</h3><pre class="ja-pre">{{ r.headers }}</pre> }
             @if (r.data) { <h3>Body</h3><pre class="ja-pre">{{ r.data | jaPretty }}</pre> }
+            @if (cut('Req_Data'); as n) { <p class="ja-muted ja-small">{{ n }}</p> }
           } @else { <p class="ja-muted">Not recorded.</p> }
         </section>
         <section class="ja-card">
@@ -47,8 +51,10 @@ import { AuditContextBar, DataChangeTable, KeyValueTable, StatusBadge, TraceRef 
           @if (l.response; as r) {
             @if (r.message) { <p>{{ r.message }}</p> }
             @if (r.error) { <h3>Error</h3><pre class="ja-pre ja-error">{{ r.error }}</pre> }
+            @if (cut('Res_Err'); as n) { <p class="ja-muted ja-small">{{ n }}</p> }
             @if (r.headers) { <h3>Headers</h3><pre class="ja-pre">{{ r.headers }}</pre> }
             @if (r.data) { <h3>Body</h3><pre class="ja-pre">{{ r.data | jaPretty }}</pre> }
+            @if (cut('Res_Data'); as n) { <p class="ja-muted ja-small">{{ n }}</p> }
             @if (!r.message && !r.error && !r.headers && !r.data) { <p class="ja-muted">Status and duration only.</p> }
           } @else { <p class="ja-muted">Not recorded.</p> }
         </section>
@@ -58,7 +64,7 @@ import { AuditContextBar, DataChangeTable, KeyValueTable, StatusBadge, TraceRef 
         </section>
         <section class="ja-card">
           <h2>Metadata</h2>
-          <ja-kv [values]="l.metadata" />
+          <ja-kv [values]="metadata()" />
         </section>
       </div>
       <section class="ja-card">
@@ -85,4 +91,16 @@ export class AccessLogPage {
     stream: ({ params }) => params ? this.api.trace(params) : of(undefined),
   });
   protected readonly error = computed(() => problemText(this.log.error()));
+
+  /** What the collector masked and cut (Juice.Audit 10.7), shown where it happened. */
+  protected readonly notes = computed(() => collectorNotes(this.log.value()?.metadata));
+  /** The metadata without the collector's notes, which are shown above. */
+  protected readonly metadata = computed(() => Object.fromEntries(Object.entries(this.log.value()?.metadata ?? {})
+    .filter(([key]) => !COLLECTOR_METADATA_KEYS.includes(key))));
+
+  /** "Cut by the collector from 120,000 characters." for a field it cut, else null. */
+  protected cut(field: string): string | null {
+    const length = this.notes().truncated[field];
+    return length === undefined ? null : `Cut by the collector from ${length.toLocaleString()} characters.`;
+  }
 }
