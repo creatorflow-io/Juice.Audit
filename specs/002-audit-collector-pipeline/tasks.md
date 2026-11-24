@@ -233,7 +233,7 @@ service (FR-022).
 - [X] T072 [P] XML docs on every new public type and option, in the style of the existing code (what it does, when to use it)
 - [X] T073 Build and test on every target framework: `dotnet build Juice.Audit.sln` and `dotnet test` for `test/Juice.Audit.Scopes.Tests` and `test/Juice.Audit.Tests` on net8.0, net9.0 and net10.0; the net6.0 build of the libraries must pass (`AuditId` fallback, `Channel`)
 - [X] T074 Run quickstart.md sections 1–3 by hand against the test hosts and record the results in the PR (remote mode, 2026-11-24: see "End-to-end run" below)
-- [ ] T075 [P] Note the core follow-ups from plan.md (`AuditEvent` context type or a current-outbox accessor; the outbox after an execution strategy replay) as issues in the Juice core repository, with links in the PR
+- [x] T075 [P] Note the core follow-ups from plan.md (`AuditEvent` context type or a current-outbox accessor; the outbox after an execution strategy replay) as issues in the Juice core repository, with links in the PR. Filed: creatorflow-io/Juice#126 (rollback leak), #127 (execution-strategy replay), #128 (allow-list and List<T>), #129 (the context of an AuditEvent)
 
 ---
 
