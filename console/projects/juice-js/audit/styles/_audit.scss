@@ -8,9 +8,11 @@
 // card and divider from its background and foreground palettes; links and selection from primary; failures from warn.
 // A theme has no slot for "succeeded", "warning" or "modified", so pass those in $tones to change them.
 //
-// Without colors(), the pages use the Juice Console's teal, amber and red theme. It sits under zero-specificity
-// :where() selectors, so the app's colors() wins whatever the order. Every class and property starts with ja- /
-// --ja-, so the pages sit beside other packages' (such as @juice-js/observability's jc-) in one app.
+// Without colors(), the pages follow juice-layout's theme: with layout.theme() (Material 3) in the app, they take its
+// --juice-* tokens, so they show the palette the viewer picked, light and dark, like the rest of the app. Without it,
+// they use the Juice Console's teal, amber and red theme. The defaults sit under zero-specificity :where() selectors,
+// so the app's colors() wins whatever the order. Every class and property starts with ja- / --ja-, so the pages sit
+// beside other packages' (such as @juice-js/observability's jc-) in one app.
 @use '@angular/material' as mat;
 @use 'sass:color';
 @use 'sass:map';
@@ -25,6 +27,13 @@
 /// @param $theme the app's theme, from mat.m2-define-light-theme or mat.m2-define-dark-theme
 /// @param $tones optional overrides: (ok, warn, bad, info, none), each a colour; backgrounds are tinted from them
 @mixin colors($theme, $tones: ()) {
+  @each $name, $value in _values($theme, $tones) {
+    --ja-#{$name}: #{$value};
+  }
+}
+
+// The --ja-* values of an M2 theme, by name without the prefix. The names are juice-layout's --juice-* tokens too.
+@function _values($theme, $tones: ()) {
   $config: mat.m2-get-color-config($theme);
   $is-dark: map.get($config, is-dark);
   $background: map.get($config, background);
@@ -43,20 +52,30 @@
   );
   $tones: map.merge($defaults, $tones);
 
-  --ja-bg: #{map.get($background, background)};
-  --ja-surface: #{$surface};
-  --ja-border: #{map.get($foreground, divider)};
-  --ja-text: #{map.get($foreground, text)};
-  --ja-muted: #{map.get($foreground, secondary-text)};
-  --ja-accent: #{_hue($primary, 700, 200, $is-dark)};
-  --ja-select: #{color.mix(_hue($primary, 500, 300, $is-dark), $surface, $tint)};
+  $values: (
+    bg: map.get($background, background),
+    surface: $surface,
+    border: map.get($foreground, divider),
+    text: map.get($foreground, text),
+    muted: map.get($foreground, secondary-text),
+    accent: _hue($primary, 700, 200, $is-dark),
+    select: color.mix(_hue($primary, 500, 300, $is-dark), $surface, $tint),
+  );
   @each $name, $value in $tones {
     @if meta.type-of($value) == color and color.alpha($value) < 1 {
       // Foreground palette entries are translucent: flatten them on the surface so the tint below is solid.
       $value: color.mix(color.change($value, $alpha: 1), $surface, color.alpha($value) * 100%);
     }
-    --ja-#{$name}: #{$value};
-    --ja-#{$name}-bg: #{color.mix($value, $surface, $tint)};
+    $values: map.merge($values, ($name: $value, '#{$name}-bg': color.mix($value, $surface, $tint)));
+  }
+  @return $values;
+}
+
+// The defaults: juice-layout's tokens when the app has layout.theme() (the app's palette, light and dark), else the
+// Juice Console's teal theme below.
+@mixin _follow-layout($theme) {
+  @each $name, $value in _values($theme) {
+    --ja-#{$name}: var(--juice-#{$name}, #{$value});
   }
 }
 
@@ -136,7 +155,7 @@
 $_accent: mat.m2-define-palette(mat.$m2-amber-palette);
 $_warn: mat.m2-define-palette(mat.$m2-red-palette);
 
-:where(:root) { @include colors(mat.m2-define-light-theme((color: (
+:where(:root) { @include _follow-layout(mat.m2-define-light-theme((color: (
   primary: mat.m2-define-palette(mat.$m2-teal-palette, 700), accent: $_accent, warn: $_warn)))); }
-:where(.dark) { @include colors(mat.m2-define-dark-theme((color: (
+:where(.dark) { @include _follow-layout(mat.m2-define-dark-theme((color: (
   primary: mat.m2-define-palette(mat.$m2-teal-palette, 300), accent: $_accent, warn: $_warn)))); }

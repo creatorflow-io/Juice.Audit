@@ -38,13 +38,15 @@ MenuModule.forRoot([...yourMenus, ...auditMenus('/audit', 200)]),
 ```
 
 ```scss
-// styles.scss (the app's global styles, once): the pages' layout, in the Juice Console's teal theme, light and dark (.dark).
+// styles.scss (the app's global styles, once): the pages' layout and colours.
 @use '@juice-js/audit';
 
-// Optional: colours from your own Angular Material (M2) themes instead.
+// Material 2 apps only, optional: colours from your own themes instead.
 :root { @include audit.colors($light-theme); }
 .dark { @include audit.colors($dark-theme); }       // under your dark-mode selector
 ```
+
+With juice-layout's Material 3 theme (`@include layout.theme()`) the pages need nothing more: they read its `--juice-*` tokens, so they show the palette the viewer picks with the layout's palette button, light and dark, like the rest of the app. Without it, they use the Juice Console's teal theme.
 
 `colors($theme, $tones: ())` sets the `--ja-*` custom properties the pages use:
 - **Text and surfaces:** the theme's background and foreground colours.
@@ -52,7 +54,7 @@ MenuModule.forRoot([...yourMenus, ...auditMenus('/audit', 200)]),
 - **Failures:** the theme's warn palette.
 - **Tones:** succeeded, warning, modified and neutral default to Material's green, deep orange, blue and greys. Pass `$tones: (ok: …, warn: …, bad: …, info: …, none: …)` to change them.
 
-The default colours use zero-specificity `:where()` selectors, so your `colors()` replaces them wherever it sits in the file. The pages don't style the page itself, so give `body` your own colours.
+The default colours use zero-specificity `:where()` selectors, so your `colors()` replaces them wherever it sits in the file (and the pages then stop following the layout's palette). The pages don't style the page itself, so give `body` your own colours; `layout.theme()` does.
 
 - `apiBase`: the API origin; empty when the API serves the app.
 - `apiPath`: where `MapJuiceAudit()` mapped the API; `/api/audit` by default.
@@ -66,7 +68,7 @@ The default colours use zero-specificity `:where()` selectors, so your `colors()
 The two packages can share one app.
 - **No collisions:** classes start with `ja-` here and `jc-` there, and menu ids start with `audit-`.
 - **Mounting:** mount each package's routes at its own path.
-- **Theme:** pass your theme to both `colors()` mixins.
+- **Theme:** with `layout.theme()` both follow the layout's palette; on Material 2, pass your theme to both `colors()` mixins.
 - **Traces:** set `traceLink` to the observability trace page, so an audit record opens its spans and logs:
 
 ```ts
