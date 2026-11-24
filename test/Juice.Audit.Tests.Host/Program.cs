@@ -2,6 +2,7 @@
 using Juice.Audit.AspNetCore.Extensions;
 using Juice.Audit.AspNetCore.Middleware;
 using Juice.Audit.EF;
+using Juice.Audit.Tests.Host.Sample;
 using Juice.Domain.Events;
 using Juice.EF.Extensions;
 using Juice.Measurement.Stores.EF;
@@ -10,10 +11,44 @@ using Juice.MediatR;
 var builder = WebApplication.CreateBuilder(args);
 
 
-builder.Services.ConfigureAuditDefault(builder.Configuration, options =>
+// The audit pipeline in the mode Audit:Mode names (InProcess in appsettings.json; Remote needs Audit:Grpc:Address and a
+// broker route for juice.audit). The sample orders' data changes go through their outbox.
+builder.Services.AddSampleOrders();
+builder.Services.AddMessaging(messaging => messaging
+    .AddOutbox()
+    .AddIdempotencyInMemory()
+    .AddPublishingPolicies(builder.Configuration.GetSection("Messaging:PublishingPolicies"))
+    .AddAuditPipeline<SampleOrderContext>(builder.Configuration, options =>
+    {
+        options.ConfigureOutbox = outbox => outbox.AppName = "audit-test-host";
+        //options.ConfigureDb = db => db.DatabaseProvider = "PostgreSQL";
+    }));
+
+// Remote mode with a broker (Audit:RabbitMQ:Host): the outbox delivers juice.audit to RabbitMQ, where the collector
+// consumes it. The publishing policy routes juice.audit to "rabbitmq" (Messaging:PublishingPolicies).
+var rabbit = builder.Configuration.GetSection("Audit:RabbitMQ");
+if (!string.IsNullOrEmpty(rabbit["Host"]))
 {
-    //options.DatabaseProvider = "PostgreSQL";
-});
+    builder.Services.AddMessaging(messaging => messaging
+        .AddDelivery(delivery =>
+        {
+            delivery.AddDeliveryPolicies(_ => { });
+            delivery.AddDeliveryProcessor<SampleOrderContext>("rabbitmq");
+        }));
+    builder.Services.AddEventBus(bus => bus.AddRabbitMQ(r =>
+    {
+        r.AddConnection("rabbitmq", c =>
+        {
+            c.Connection = rabbit["Host"];
+            c.Port = int.TryParse(rabbit["Port"], out var port) ? port : 5672;
+            c.UserName = rabbit["UserName"];
+            c.Password = rabbit["Password"];
+            c.VirtualHost = rabbit["VirtualHost"];
+        });
+        r.AddInfrastructureTopology("rabbitmq", t => t.DeclareExchange("juice.audit", "topic"));
+        r.AddProducer("rabbitmq", "rabbitmq");
+    }));
+}
 
 builder.Services.AddExecutionTimeMeasurement();
 builder.Services.AddMeasurementEFStores(builder.Configuration, options =>
@@ -44,6 +79,8 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 app.UseStaticFiles();
+// The entry point of the sample orders' commands: TransactionBehavior and the outbox need a MessageContext.
+app.UseMessageContext("audit-test-host");
 
 var configs = new AuditFilterOptions();
 builder.Configuration.Bind("Audit", configs);
@@ -138,18 +175,29 @@ app.MapGet("/api/{id}/status", async (int id) =>
 {
     return Results.Ok(id);
 });
-// Use with ConfigureAuditDefault together
+app.MapSampleOrders();
+
 await MigrateAsync(app);
 
 app.Run();
 
 async Task MigrateAsync(WebApplication app)
 {
+    await app.Services.CreateSampleOrdersAsync();
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-    await db.MigrateAsync();
+    // In-process mode only: a remote app carries no audit database.
+    var db = scope.ServiceProvider.GetService<AuditDbContext>();
+    if (db != null)
+    {
+        await db.MigrateAsync();
+    }
     var db1 = scope.ServiceProvider.GetRequiredService<MeasurementDbContext>();
     await db1.MigrateAsync();
+    if (!string.IsNullOrEmpty(app.Configuration["Audit:RabbitMQ:Host"]))
+    {
+        // The exchange the outbox publishes juice.audit to.
+        await app.InitRabbitMQInfrastructureAsync();
+    }
 }
 
 public partial class Program { }
