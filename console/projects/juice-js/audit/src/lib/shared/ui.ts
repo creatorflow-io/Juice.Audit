@@ -7,7 +7,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AUDIT_RANGES, AuditContextService } from '../core/context.service';
 import { AccessLogSummary, DataChangeSummary, JsonValue } from '../core/models';
 import { AuditLinkPipe, AuditLinks } from '../core/options';
-import { DurationPipe, KeysPipe, actionClass, formatValue, statusClass } from './format';
+import { DurationPipe, KeysPipe, actionClass, formatBytes, formatValue, statusClass, truncatedChange } from './format';
 
 /**
  * The bar on top of every page: its title, the time window, and a lookup that opens everything audited under a trace
@@ -161,13 +161,17 @@ interface DiffRow { field: string; before: string; after: string; changed: boole
 
 /**
  * A changed row's values side by side: before (OriginalValues) and after (CurrentValues), changed fields first. An
- * insert has no before and a delete no after.
+ * insert has no before and a delete no after. A change too large to keep whole shows the start that was kept.
  */
 @Component({
   selector: 'ja-change-diff',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (rows().length === 0) { <p class="ja-muted">No values were recorded.</p> }
+    @if (truncated(); as t) {
+      <p class="ja-muted">This change was too large to store whole{{ t.originalSize !== null ? ' (' + size(t.originalSize) + ')' : '' }}, so only its start was kept.</p>
+      @if (t.partial) { <pre class="ja-pre">{{ t.partial }}</pre> }
+    }
+    @else if (rows().length === 0) { <p class="ja-muted">No values were recorded.</p> }
     @else {
       <table class="ja-table ja-diff">
         <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
@@ -186,6 +190,9 @@ interface DiffRow { field: string; before: string; after: string; changed: boole
 })
 export class ChangeDiff {
   readonly changes = input.required<JsonValue>();
+
+  protected readonly truncated = computed(() => truncatedChange(this.changes()));
+  protected readonly size = formatBytes;
 
   protected readonly rows = computed<DiffRow[]>(() => {
     const changes = asObject(this.changes());
