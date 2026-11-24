@@ -7,6 +7,8 @@ namespace Juice.Audit.Domain.DataAuditAggregate
         public DataAudit() { }
         public DataAudit(string? user, DateTimeOffset dateTime, string action, string? database, string? schema, string table, string keyValues, string dataChanges, string? traceId, string? tenantId = default)
         {
+            // Given here, not by the database: a change sent twice is stored once (see AuditId).
+            Id = AuditId.New();
             User = user;
             DateTime = dateTime;
             Action = action;
@@ -51,5 +53,31 @@ namespace Juice.Audit.Domain.DataAuditAggregate
 
         public void SetTraceId(string requestId)
             => TraceId = requestId;
+
+        /// <summary>
+        /// Replaces the recorded changes, for the collector's processors (masking, truncation) before the record is
+        /// stored. The value must stay valid JSON.
+        /// </summary>
+        public void RewriteChanges(string changes)
+        {
+            Changes = changes;
+            this.ValidateJson(Changes);
+            this.ThrowIfHasErrors();
+        }
+
+        /// <summary>
+        /// Sets the tenant once, when the record has none: a record queued in a request keeps that request's tenant
+        /// though it is written later, from a scope that has no tenant.
+        /// </summary>
+        public void SetTenant(string? tenantId)
+        {
+            if (TenantId != null || string.IsNullOrEmpty(tenantId))
+            {
+                return;
+            }
+            TenantId = tenantId;
+            this.NotExceededLength(TenantId, Juice.MultiTenant.Constants.TenantIdMaxLength);
+            this.ThrowIfHasErrors();
+        }
     }
 }

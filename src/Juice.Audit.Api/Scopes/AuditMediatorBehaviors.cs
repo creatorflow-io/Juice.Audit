@@ -101,8 +101,12 @@ namespace Juice.Audit.Api.Scopes
         /// <summary>Inside the tracing behavior (<see cref="int.MinValue"/>), outside idempotency (+10).</summary>
         public const int Order = int.MinValue + 5;
 
-        /// <summary>Saving an audit record sends this command: it is part of the scope being saved.</summary>
-        public static bool IsAudited(Type requestType) => requestType != typeof(SaveAuditInfoCommand);
+        /// <summary>
+        /// Saving audit records sends these commands: they are part of the scope being saved, and auditing them would
+        /// queue a record per batch written, which the next batch writes, and so on.
+        /// </summary>
+        public static bool IsAudited(Type requestType)
+            => requestType != typeof(SaveAuditInfoCommand) && requestType != typeof(SaveAuditBatchCommand);
 
         public static AuditScopeRequest Request(Type type, string method, IServiceProvider services)
         {

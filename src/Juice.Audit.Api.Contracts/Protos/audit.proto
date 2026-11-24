@@ -16,6 +16,8 @@ message DataAuditMessage {
   bytes dataChanges = 8;
   google.protobuf.StringValue reqId = 9;
   google.protobuf.StringValue tenantId = 10;
+  // 10.7: the id given in the app ("D" format), the deduplication key. Empty: the server gives one.
+  google.protobuf.StringValue id = 11;
 }
 
 message AccessLogMessage{
@@ -49,6 +51,8 @@ message AccessLogMessage{
 
   bool restricted = 25;
   google.protobuf.StringValue tenantId = 26;
+  // 10.7: the id given in the app ("D" format), the deduplication key. Empty: the server gives one.
+  google.protobuf.StringValue id = 27;
 }
 
 message AuditRequest{
@@ -61,6 +65,37 @@ message AuditOperationResult{
     google.protobuf.StringValue message = 2;
 }
 
+// 10.7: several access records, each with its best-effort data changes, in one call.
+message AuditBatchRequest {
+  repeated AuditRequest items = 1;
+}
+
+message AuditRecordResult {
+  enum Outcome {
+    // Not set, or a value this client doesn't know: never read as stored.
+    OUTCOME_UNSPECIFIED = 0;
+    STORED = 4;
+    // Already stored: a success for the client.
+    DUPLICATE = 1;
+    // Invalid or refused: do not retry.
+    REJECTED = 2;
+    // Transient (the database is unavailable): retry.
+    RETRYABLE = 3;
+  }
+  // The record's id, access record or data change.
+  string id = 1;
+  Outcome outcome = 2;
+  google.protobuf.StringValue reason = 3;
+}
+
+message AuditBatchResult {
+  // One per access record and per data change of the request.
+  repeated AuditRecordResult results = 1;
+}
+
 service AuditGrpcService {
+  // Kept for clients before 10.7.
   rpc Log(AuditRequest) returns (AuditOperationResult) {}
+  // 10.7
+  rpc LogBatch(AuditBatchRequest) returns (AuditBatchResult) {}
 }

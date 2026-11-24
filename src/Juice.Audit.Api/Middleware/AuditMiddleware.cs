@@ -44,6 +44,11 @@ namespace Juice.Audit.AspNetCore.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
+            if (_filter.IsCollectorCall(context.Request.Path.Value))
+            {
+                await _next(context);
+                return;
+            }
             using var auditContextAccessor = context.RequestServices.GetRequiredService<IAuditContextAccessor>();
             var logger = context.RequestServices.GetRequiredService<ILogger<AuditMiddleware>>();
 

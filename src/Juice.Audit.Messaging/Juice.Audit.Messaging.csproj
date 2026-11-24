@@ -12,7 +12,15 @@
     </ItemGroup>
 
     <ItemGroup>
+        <InternalsVisibleTo Include="Juice.Audit.Scopes.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Juice.Messaging" Version="$(JuiceMessagingVersion)" />
+        <!-- IConsumerBuilder (via Juice.EventBus) and the local transport for in-process mode. -->
+        <PackageReference Include="Juice.Messaging.Local" Version="$(JuiceMessagingVersion)" />
+        <!-- AddAuditPipeline in-process: the delivery processor of the app's outbox for the local publisher. -->
+        <PackageReference Include="Juice.Messaging.Outbox.Delivery" Version="$(JuiceMessagingVersion)" />
     </ItemGroup>
 
 </Project>

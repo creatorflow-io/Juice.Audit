@@ -1,4 +1,5 @@
-﻿using Juice.Audit.Domain.AccessLogAggregate;
+﻿using Juice.Audit.Domain;
+using Juice.Audit.Domain.AccessLogAggregate;
 using Juice.Audit.Domain.DataAuditAggregate;
 using Juice.Audit.EF;
 using Juice.Audit.EF.Repositories;
@@ -55,6 +56,10 @@ namespace Microsoft.Extensions.DependencyInjection
                         {
                             x.MigrationsHistoryTable("__EFAuditMigrationsHistory", schema);
                             x.MigrationsAssembly("Juice.Audit.EF.SqlServer");
+                            // The collector writes batches of hundreds of rows: SQL Server's default of 42 rows per
+                            // command would take a dozen round trips for one batch. EF still splits a command at the
+                            // provider's 2100 parameter limit (SC-003).
+                            x.MaxBatchSize(1000);
                         });
                         break;
                     default:
@@ -82,6 +87,8 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddScoped<IDataAuditRepository, DataAuditRepository>();
             services.AddScoped<IAccessLogRepository, AccessLogRepository>();
+            services.AddScoped<IAuditBatchStore, AuditBatchStore>();
+            services.AddSingleton<IAuditWriteErrorClassifier, AuditWriteErrorClassifier>();
             return services;
         }
     }

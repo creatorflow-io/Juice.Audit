@@ -17,7 +17,17 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- The gRPC mapper and the export metrics are shared with the audit packages, not public API. -->
+        <InternalsVisibleTo Include="Juice.Audit.Api" />
+        <InternalsVisibleTo Include="Juice.Audit.Messaging" />
+        <InternalsVisibleTo Include="Juice.Audit.Scopes.Tests" />
+        <InternalsVisibleTo Include="Juice.Audit.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Grpc.Net.ClientFactory" Version="$(GrpcVersion)" />
+        <!-- The background export worker (BackgroundService) and its options. -->
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
     </ItemGroup>
 
 </Project>

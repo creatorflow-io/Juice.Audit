@@ -74,8 +74,9 @@ It is saved, as a request is, when data changed, an access log or time log was r
 matched its method and path, e.g. `o.Filter = new AuditFilterOptions().Include("OrderPlaced", "MESSAGE")`. Without a
 filter, a scope that changed nothing saves nothing.
 
-A data change with no scope open (an app without these scopes) is skipped. Earlier versions threw there: the change was
-lost with a `[DispatchAuditEvents] Error` warning, and the rest of that save's changes were not audited either.
+A data change with no scope open (an app without these scopes) is skipped, unless its transaction has an audited outbox
+(see [Delivery guarantees](#delivery-guarantees)). Earlier versions threw there: the change was lost with a
+`[DispatchAuditEvents] Error` warning, and the rest of that save's changes were not audited either.
 
 A change made inside a transaction managed by Juice's `TransactionBehavior` is saved only if the transaction commits.
 Otherwise it is dropped: the record of the attempt is still saved, with the number of dropped changes in its metadata
@@ -83,6 +84,119 @@ Otherwise it is dropped: the record of the attempt is still saved, with the numb
 
 A data change with no user of its own (a DbContext knows one only through `IHttpContextAccessor`) takes the user of its
 scope.
+
+## Delivery guarantees
+
+Since 10.7 nothing is written inside the request. The app hands each record off and a collector (the audit service,
+or the app itself in-process) stores it. The two kinds of record travel differently:
+
+| Record | Transport | Guarantee |
+|---|---|---|
+| **Data change** (`DataAudit`) | Juice outbox, in the business transaction → broker (or the local transport) → collector | Stored if and only if the business change committed: at least once, deduplicated by id |
+| **Access record** (`AccessLog`) | Bounded in-memory queue → background batches → collector | Best effort: lost when the process crashes or the queue is full, and every loss is counted |
+
+Records get their id in the app (a time-ordered GUID), so a record sent twice is stored once. The collector writes a
+batch in a few commands and skips the ids it already has.
+
+### Setting it up
+
+One call, in the app's messaging setup. `Audit:Mode` picks the mode and has no default: a missing or unknown value
+fails at startup.
+
+```csharp
+services.AddMessaging(m => m
+    .AddOutbox()
+    .AddIdempotencyInMemory()                          // or the app's own idempotency store
+    .AddPublishingPolicies(configuration.GetSection("Messaging:PublishingPolicies"))
+    .AddAuditPipeline<OrderingContext>(configuration, o =>
+    {
+        o.ConfigureDb = db => db.DatabaseProvider = "PostgreSQL";   // InProcess only
+        o.ConfigureOutbox = outbox => outbox.AppName = "ordering-api";
+    }));
+app.UseMessageContext("ordering-api");
+app.UseAudit("ordering-api");
+```
+
+| `Audit:Mode` | Access records | Data changes | The app also needs |
+|---|---|---|---|
+| `Remote` | gRPC `LogBatch` to `Audit:Grpc:Address` (or `ConfigureGrpcClient`) | its broker | a `juice.audit` route to its broker |
+| `InProcess` | written to its own audit database | the outbox delivers them to its own consumer (`local`) | a `juice.audit` route to `local` |
+
+```json
+"Messaging": { "PublishingPolicies": { "Rules": [
+  { "Priority": 100, "Match": { "Domain": "juice.audit" }, "Publishers": [ { "Key": "local", "Destination": "juice.audit" } ] }
+] } }
+```
+
+`TContext` is the app's `DbContextBase` with an outbox (`IOutboxContext`), changed under `TransactionBehavior`. An app
+with several contexts adds `AddAuditOutbox<TOther>()` for each other one. An app that already runs the delivery
+processor of `TContext` for `local` sets `AddLocalDeliveryProcessor = false`.
+
+The collector (`test/Juice.Audit.Tests.GrpcHost` is one):
+
+```csharp
+services.ConfigureAuditGrpcHost(configuration);
+services.AddAuditCollector();                      // processors and metrics, "Audit:Collector"
+services.AddMessaging(m => m.AddIdempotencyInMemory());
+services.AddEventBus(bus => bus.AddRabbitMQ(r => r
+    .AddConsumer("audit", "juice.audit", "rabbitmq", c => c.SubscribeAuditDataChanges())));
+app.MapAuditGrpcServer();                          // Log and LogBatch
+app.MapJuiceAudit("/api/audit");
+```
+
+`ConfigureAuditGrpcClient()` and `ConfigureAuditDefault()` keep working without `AddAuditPipeline`. They now queue the
+access records too, and the data changes stay best effort until the app adds `AddAuditOutbox<TContext>()`.
+
+### Options
+
+| Section | Option | Default | |
+|---|---|---|---|
+| `Audit:Export` | `QueueCapacity` | 10 000 | records waiting at most; a record that finds it full is dropped and counted |
+| | `MaxBatchSize`, `MaxBatchAge` | 512, 2 s | a batch goes when it's full or its first record is that old |
+| | `ExportTimeout` | 10 s | the deadline of every export call |
+| | `MaxRetryAttempts`, `InitialBackoff`, `MaxBackoff` | 5, 1 s, 30 s | retries of a failed batch, doubling with ±20% jitter; an attempt that stores some records starts the count over |
+| | `ShutdownFlushTimeout` | 5 s | how long the queue is sent at shutdown |
+| | `DropWarningInterval` | 30 s | lost records are logged as one warning per interval |
+| | `Synchronous` | `false` | export inside the request, for tests that read the database right after it |
+| `Audit:Outbox` | `AppName` | entry assembly | the app name on each event |
+| | `MaxEntriesPerEvent`, `MaxEventBytes` | 500, 512 KiB | larger sets are split; a larger change is cut (`$truncated`, `$originalSize`). The bytes of the event as the outbox stores and publishes it; keep it under the broker's message limit (NATS: 1 MiB) |
+| | `RequireScope` | `false` | see below |
+| `Audit:Collector` | `RedactHeaders`, `RedactMask` | `Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`; `***` | headers masked before storage, named in the record's `Redacted` metadata |
+| | `MaxBodyLength` | 65 536 | longer bodies and errors are cut (`Truncated` metadata), and longer changes |
+
+A collector adds its own processors with `AddAuditCollector().AddProcessor<T>()` (`IAuditRecordProcessor`, run in
+`Order` with the built-ins at 100 and 200). One that throws or rejects fails only its record.
+
+Its own gRPC calls are excluded from `UseAudit()` by default (`AuditFilterOptions.CollectorGrpcPath`), and handling
+the outbox events opens no audit scope, so the collector doesn't audit itself.
+
+A change made with no audit scope open (a background job without `AddMediatorAudit()`) now goes through the outbox
+when its transaction has one, with the trace id of `Activity.Current`. Before 10.7 it was skipped. Set
+`Audit:Outbox:RequireScope` to `true` to keep skipping it.
+
+### Metrics
+
+Meter `Juice.Audit`: collect it with `.WithMetrics(m => m.AddMeter("Juice.Audit"))`.
+
+| Instrument | Where | Tags |
+|---|---|---|
+| `juice.audit.export.queue.size`, `.queue.capacity` | app | |
+| `juice.audit.export.records` | app | `outcome` = `exported`, `duplicate`, `dropped`; `reason` = `queue_full`, `retries_exhausted`, `shutdown`, `rejected`, `unconfirmed` (a collector before 10.7) |
+| `juice.audit.export.retries`, `.batches.failed` (`error`), `.duration` (`outcome`) | app | |
+| `juice.audit.outbox.entries` | app | `outcome` = `outboxed`, `best_effort`; `reason` = `no_transaction`, `no_binding`, `no_route`, `tenant_mismatch`, `unmanaged` (a transaction the app opened itself), `error` |
+| `juice.audit.collector.records` | collector | `kind` = `access`, `data`; `outcome` = `received`, `stored`, `duplicate`, `rejected`, `failed` |
+| `juice.audit.collector.write.duration`, `.batch.size` | collector | `kind` |
+
+An access record's metadata says where its scope's changes went: `OutboxedChanges`, `BestEffortChanges`, and
+`UncommittedChanges` for those of a rolled back transaction.
+
+### Upgrading
+
+Upgrade the collector first, or with the apps: a 10.7 app sends `LogBatch`, and falls back to one call per record,
+with one warning, against an older collector. Such a collector can't tell a resent record from a new one, so a record
+it may have stored is never sent again, as before 10.7: one it refuses is lost as `rejected`, and one whose call is cut
+off as `unconfirmed`. Only a record it never received (the collector can't be reached) is retried. Then, app by app, add `AddAuditPipeline` (or `AddAuditOutbox<TContext>()`)
+and the `juice.audit` route, and subscribe the collector to it.
 
 ## Time logging
 

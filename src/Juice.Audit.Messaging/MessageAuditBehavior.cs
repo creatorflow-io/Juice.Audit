@@ -24,7 +24,10 @@ namespace Juice.Audit.Messaging
 
         public ValueTask<EventDispatchResult> Handle(IIntegrationEvent evt, EventDispatchContext context,
             IntegrationEventHandlerDelegate next, CancellationToken cancellationToken)
-            => _runner.RunAsync(
+            // The collector storing audit records is not itself audited: no record, no recursion.
+            => evt is DataChangesAudited
+            ? next(evt, context, cancellationToken)
+            : _runner.RunAsync(
                 // A message has no user of its own: the trace leads to the request that raised it.
                 new AuditScopeRequest(context.EventName, AuditScopeMethods.Message, context.EventName, context.TenantId,
                     evt.MessageId.ToString()),

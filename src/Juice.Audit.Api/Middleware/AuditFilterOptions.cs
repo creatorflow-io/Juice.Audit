@@ -14,12 +14,38 @@ namespace Juice.Audit.AspNetCore.Middleware
         public static readonly string[] DefaultMethods = { "POST", "PUT", "PATCH", "DELETE" };
 
         /// <summary>
-        /// The options <c>UseAudit()</c> starts from: one rule including <see cref="DefaultMethods"/> on every path.
-        /// Rules added after it take precedence; <see cref="Clear"/> removes it, and with no rules at all every
-        /// request is recorded.
+        /// The audit collector's own gRPC calls (<c>Log</c>, <c>LogBatch</c>): a collector running <c>UseAudit()</c>
+        /// must not record an access log for every batch it is sent.
+        /// </summary>
+        public const string CollectorGrpcPath = "/juice.audit.grpc.AuditGrpcService/*";
+
+        /// <summary>
+        /// The options <c>UseAudit()</c> starts from: one rule including <see cref="DefaultMethods"/> on every path,
+        /// and one excluding <see cref="CollectorGrpcPath"/> above every other rule. Rules added after them take
+        /// precedence over the first; <see cref="Clear"/> removes both, and with no rules at all every request is
+        /// recorded.
         /// </summary>
         public static AuditFilterOptions CreateDefault()
-            => new AuditFilterOptions().Include(string.Empty, DefaultMethods);
+        {
+            var options = new AuditFilterOptions().Include(string.Empty, DefaultMethods);
+            options.Filters = options.Filters.Append(new PathFilterEntry
+            {
+                Path = CollectorGrpcPath,
+                IsExcluded = true,
+                Priority = int.MaxValue
+            }).ToArray();
+            return options;
+        }
+
+        /// <summary>
+        /// A call to the collector's own gRPC service while the rule excluding <see cref="CollectorGrpcPath"/> is kept:
+        /// not audited at all. An exclusion only stops the rules matching; a slow or failing batch would still be
+        /// recorded, an access log per batch. Removing the rule (<see cref="Clear"/>) audits them again.
+        /// </summary>
+        public bool IsCollectorCall(string? path)
+            => path != null
+                && path.StartsWith(CollectorGrpcPath.TrimEnd('*'), StringComparison.OrdinalIgnoreCase)
+                && Filters.Any(f => f.IsExcluded && f.Path == CollectorGrpcPath);
 
         public int? ExecutionTimeThreshold { get; set; }
         public int RequestAbortedStatusCode { get; set; } = 408;
