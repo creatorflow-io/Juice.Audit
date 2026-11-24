@@ -30,10 +30,12 @@ namespace Juice.Audit.Scopes.Tests
         private static ValueTask CommitAsync(IMediator mediator, Guid transactionId)
             => mediator.Publish(new TransactionCommitted(transactionId));
 
-        [Fact]
-        public async Task Change_in_a_committed_transaction_is_saved_Async()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Change_in_a_committed_transaction_is_saved_Async(bool outbox)
         {
-            using var provider = Build(mediatorAudit: true);
+            using var provider = Build(mediatorAudit: true, outbox: outbox);
             var transaction = Guid.NewGuid();
 
             await RunAsync(provider, async mediator =>
@@ -45,12 +47,16 @@ namespace Juice.Audit.Scopes.Tests
             var saved = provider.Records().Should().ContainSingle().Subject;
             saved.DataAudits.Should().ContainSingle();
             saved.AccessLog.Metadata.ContainsKey("UncommittedChanges").Should().BeFalse();
+            // With the outbox registered, the change it couldn't take is marked as carried best effort.
+            saved.AccessLog.Metadata.ContainsKey("BestEffortChanges").Should().Be(outbox);
         }
 
-        [Fact]
-        public async Task Change_in_a_transaction_that_never_commits_is_dropped_but_the_attempt_is_saved_Async()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Change_in_a_transaction_that_never_commits_is_dropped_but_the_attempt_is_saved_Async(bool outbox)
         {
-            using var provider = Build(mediatorAudit: true);
+            using var provider = Build(mediatorAudit: true, outbox: outbox);
 
             await RunAsync(provider, async mediator =>
             {
@@ -64,10 +70,12 @@ namespace Juice.Audit.Scopes.Tests
             saved.AccessLog.Metadata["UncommittedChanges"]!.ToString().Should().Be("2");
         }
 
-        [Fact]
-        public async Task Failed_work_keeps_what_an_earlier_transaction_committed_Async()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task Failed_work_keeps_what_an_earlier_transaction_committed_Async(bool outbox)
         {
-            using var provider = Build(mediatorAudit: true);
+            using var provider = Build(mediatorAudit: true, outbox: outbox);
             var first = Guid.NewGuid();
 
             await RunAsync(provider, async mediator =>
@@ -82,10 +90,12 @@ namespace Juice.Audit.Scopes.Tests
             saved.AccessLog.Metadata["UncommittedChanges"]!.ToString().Should().Be("1");
         }
 
-        [Fact]
-        public async Task A_retry_saves_only_the_attempt_that_committed_Async()
+        [Theory]
+        [InlineData(false)]
+        [InlineData(true)]
+        public async Task A_retry_saves_only_the_attempt_that_committed_Async(bool outbox)
         {
-            using var provider = Build(mediatorAudit: true);
+            using var provider = Build(mediatorAudit: true, outbox: outbox);
             var retry = Guid.NewGuid();
 
             await RunAsync(provider, async mediator =>

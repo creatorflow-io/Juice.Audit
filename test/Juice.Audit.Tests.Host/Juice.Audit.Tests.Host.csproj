@@ -13,6 +13,16 @@
         <ProjectReference Include="..\..\src\Juice.Audit.EF.PostgreSQL\Juice.Audit.EF.PostgreSQL.csproj" />
         <ProjectReference Include="..\..\src\Juice.Audit.EF.SqlServer\Juice.Audit.EF.SqlServer.csproj" />
         <ProjectReference Include="..\..\src\Juice.Audit.EF\Juice.Audit.EF.csproj" />
+        <ProjectReference Include="..\..\src\Juice.Audit.Messaging\Juice.Audit.Messaging.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Label="Sample orders (AddAuditPipeline)">
+        <PackageReference Include="Juice.MediatR.Behaviors" Version="$(JuiceVersion)" />
+        <PackageReference Include="Juice.AspNetCore" Version="$(JuiceVersion)" />
+        <PackageReference Include="Juice.Messaging.Outbox.EF" Version="$(JuiceMessagingVersion)" />
+        <PackageReference Include="Juice.Messaging.Idempotency.Caching" Version="$(JuiceMessagingVersion)" />
+        <PackageReference Include="Juice.EventBus.RabbitMQ" Version="$(JuiceMessagingVersion)" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EFVersion)" />
     </ItemGroup>
 
     <ItemGroup>

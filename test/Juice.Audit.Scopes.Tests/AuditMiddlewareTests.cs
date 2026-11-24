@@ -165,6 +165,23 @@ namespace Juice.Audit.Scopes.Tests
             provider.Records().Should().ContainSingle();
         }
 
+        [Fact(DisplayName = "The collector's own gRPC calls aren't recorded, even slow ones, while the default rule is kept")]
+        public async Task Collector_calls_are_not_audited_Async()
+        {
+            using var provider = Build();
+            const string logBatch = "/juice.audit.grpc.AuditGrpcService/LogBatch";
+
+            // Slower than the threshold: an exclusion alone would still record it.
+            await InvokeAsync(provider, "POST", logBatch, async _ => await Task.Delay(5),
+                o => o.ExecutionTimeThreshold = 1, defaults: true);
+            provider.Records().Should().BeEmpty();
+
+            // Without the rule, the app asked for them.
+            await InvokeAsync(provider, "POST", logBatch, async _ => await Task.Delay(5),
+                o => o.Clear().ExecutionTimeThreshold = 1, defaults: true);
+            provider.Records().Should().ContainSingle();
+        }
+
         private static async Task<HttpContext> InvokeAsync(ServiceProvider provider, string method, string path,
             RequestDelegate next, Action<AuditFilterOptions>? configure = default, bool defaults = false)
         {

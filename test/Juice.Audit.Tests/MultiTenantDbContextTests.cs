@@ -74,7 +74,7 @@ namespace Juice.Audit.Tests
                 .ToListAsync();
         }
 
-        private class StubMultiTenantContextAccessor : IMultiTenantContextAccessor
+        internal sealed class StubMultiTenantContextAccessor : IMultiTenantContextAccessor
         {
             public IMultiTenantContext MultiTenantContext { get; private set; } = new MultiTenantContext<TenantInfo>();
 

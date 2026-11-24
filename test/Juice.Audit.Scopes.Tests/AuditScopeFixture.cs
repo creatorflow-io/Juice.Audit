@@ -17,8 +17,10 @@ namespace Juice.Audit.Scopes.Tests
     /// </summary>
     internal static class AuditScopeFixture
     {
+        /// <param name="outbox">The app also calls <c>AddAuditOutbox</c>, for a context these changes don't come
+        /// from: no binding owns their transactions, so they stay best effort with the same results.</param>
         public static ServiceProvider Build(bool messageAudit = false, bool mediatorAudit = false,
-            Action<AuditScopeOptions>? configure = default)
+            Action<AuditScopeOptions>? configure = default, bool outbox = false, Action<IServiceCollection>? extra = default)
         {
             var services = new ServiceCollection();
             services.AddLogging();
@@ -42,6 +44,11 @@ namespace Juice.Audit.Scopes.Tests
             services.AddScoped<SendingHandler>();
             services.AddScoped<ReadingHandler>();
             services.AddScoped<ChangingThenFailingHandler>();
+            if (outbox)
+            {
+                services.AddAuditOutbox<SampleOrderContext>();
+            }
+            extra?.Invoke(services);
             return services.BuildServiceProvider();
         }
 
