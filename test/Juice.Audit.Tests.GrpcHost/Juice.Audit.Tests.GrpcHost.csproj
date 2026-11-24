@@ -8,6 +8,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Juice.Audit.Api\Juice.Audit.Api.csproj" />
+    <ProjectReference Include="..\..\src\Juice.Audit.Messaging\Juice.Audit.Messaging.csproj" />
+    <ProjectReference Include="..\..\src\Juice.Audit.EF.PostgreSQL\Juice.Audit.EF.PostgreSQL.csproj" />
   </ItemGroup>
-  
+
+  <ItemGroup Label="The data change consumer">
+    <PackageReference Include="Juice.EventBus.RabbitMQ" Version="$(JuiceMessagingVersion)" />
+    <PackageReference Include="Juice.Messaging.Idempotency.Caching" Version="$(JuiceMessagingVersion)" />
+  </ItemGroup>
+
 </Project>
