@@ -17,6 +17,13 @@
         </PackageReference>
 
         <PackageReference Include="FluentAssertions" Version="6.8.0" />
+        <!-- Outbox tests: a SQLite business context under TransactionBehavior, delivered by the local transport. -->
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="$(EFVersion)" />
+        <PackageReference Include="Juice.MediatR.Behaviors" Version="$(JuiceVersion)" />
+        <PackageReference Include="Juice.Messaging.Outbox.EF" Version="$(JuiceMessagingVersion)" />
+        <PackageReference Include="Juice.Messaging.Local" Version="$(JuiceMessagingVersion)" />
+        <!-- [InitializeMessageContext] for the messaging tests (constitution: quality gates). -->
+        <PackageReference Include="Juice.XUnit" Version="$(JuiceVersion)" />
     </ItemGroup>
 
     <ItemGroup>

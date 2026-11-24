@@ -1,6 +1,10 @@
 using System.Diagnostics;
 using FluentAssertions;
 using Juice.Audit.Api.Scopes;
+using Juice.Audit.AspNetCore.Middleware;
+using Juice.Audit.Commands;
+using Juice.Audit.Domain.AccessLogAggregate;
+using Juice.Audit.Domain.DataAuditAggregate;
 using Juice.MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using static Juice.Audit.Scopes.Tests.AuditScopeFixture;
@@ -112,6 +116,46 @@ namespace Juice.Audit.Scopes.Tests
             await ChangeAsync(scope.ServiceProvider.GetRequiredService<IMediator>());
 
             provider.Records().Should().BeEmpty();
+        }
+
+        [Fact(DisplayName = "Writing audit records is not audited, even when every request is: it would loop")]
+        public async Task Audit_writes_are_not_audited_Async()
+        {
+            // A filter that matches every request: a control request is saved, the audit writes are not.
+            using var provider = Build(mediatorAudit: true, configure: o => o.Filter = new AuditFilterOptions(),
+                extra: services =>
+                {
+                    services.AddScoped<IRequestHandler<Ping>, PingHandler>();
+                    services.AddScoped<IRequestHandler<SaveAuditBatchCommand, AuditBatchResult>, NoBatchStore>();
+                    services.AddScoped<IRequestHandler<SaveAuditInfoCommand, IOperationResult>, NoInfoStore>();
+                });
+            using var scope = provider.CreateScope();
+            var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
+
+            await mediator.Send(new SaveAuditBatchCommand(Array.Empty<AuditBatchItem>()));
+            await mediator.Send(new SaveAuditInfoCommand(new AccessLog("a", "u"), Array.Empty<DataAudit>()));
+            await mediator.Send(new Ping());
+
+            provider.Records().Should().ContainSingle().Which.AccessLog.Request!.Path.Should().Be(nameof(Ping));
+        }
+
+        public sealed record Ping : MessageBase, IRequest;
+
+        private sealed class PingHandler : IRequestHandler<Ping>
+        {
+            public ValueTask Handle(Ping request, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+        }
+
+        private sealed class NoBatchStore : IRequestHandler<SaveAuditBatchCommand, AuditBatchResult>
+        {
+            public ValueTask<AuditBatchResult> Handle(SaveAuditBatchCommand request, CancellationToken cancellationToken)
+                => ValueTask.FromResult(new AuditBatchResult(Array.Empty<AuditRecordResult>()));
+        }
+
+        private sealed class NoInfoStore : IRequestHandler<SaveAuditInfoCommand, IOperationResult>
+        {
+            public ValueTask<IOperationResult> Handle(SaveAuditInfoCommand request, CancellationToken cancellationToken)
+                => ValueTask.FromResult<IOperationResult>(OperationResult.Success);
         }
     }
 }
