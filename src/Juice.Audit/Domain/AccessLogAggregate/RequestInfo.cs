@@ -47,6 +47,16 @@ namespace Juice.Audit.Domain.AccessLogAggregate
 
         public void SetData(Dictionary<string, object>? data) => Data = data == null ? null : JsonConvert.SerializeObject(data);
 
+        /// <summary>
+        /// Replaces the recorded body and headers, for the collector's processors (masking, truncation) before the
+        /// record is stored.
+        /// </summary>
+        public void Rewrite(string? data, string? headers)
+        {
+            Data = data;
+            Headers = headers;
+        }
+
         protected override IEnumerable<object> GetEqualityComponents() => new []{TraceId};
     }
 }

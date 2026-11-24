@@ -70,6 +70,15 @@ namespace Juice.Audit.Api.Scopes
                 {
                     auditContext.AccessRecord.Metadata["UncommittedChanges"] = auditContext.UncommittedAuditEntryCount;
                 }
+                // Where the scope's committed changes went: through the outbox (not on this record), or with it.
+                if (auditContext.OutboxedChangeCount > 0)
+                {
+                    auditContext.AccessRecord.Metadata["OutboxedChanges"] = auditContext.OutboxedChangeCount;
+                }
+                if (auditContext.BestEffortChangeCount > 0)
+                {
+                    auditContext.AccessRecord.Metadata["BestEffortChanges"] = auditContext.BestEffortChangeCount;
+                }
                 var auditService = services.GetService<IAuditService>();
                 tracker.Checkpoint("GetAuditService");
 

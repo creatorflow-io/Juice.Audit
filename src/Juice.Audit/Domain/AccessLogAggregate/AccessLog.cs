@@ -10,6 +10,8 @@ namespace Juice.Audit.Domain.AccessLogAggregate
         public AccessLog() { }
         public AccessLog(string action, string? user)
         {
+            // Given here, not by the database: a record sent twice is stored once (see AuditId).
+            Id = AuditId.New();
             Action = action;
             User = user;
             DateTime = DateTimeOffset.UtcNow;

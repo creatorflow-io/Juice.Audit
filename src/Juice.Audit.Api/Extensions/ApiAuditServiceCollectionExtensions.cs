@@ -1,5 +1,7 @@
 ﻿using Grpc.Net.ClientFactory;
 using Juice.Audit.Api.NotificationHandlers;
+using Juice.Audit.Collector;
+using Juice.Audit.Domain;
 using Juice.Audit.Api.Scopes;
 using Juice.Domain.Events;
 using Juice.EF;
@@ -71,21 +73,55 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddDefaultAuditService()
                 .AddAuditCommandHandlers()
+                .AddAuditCollectorMetrics()
                 .AddAuditDbContext(configuration, configureDb)
                 .AddEFAuditRepos();
             return services;
         }
 
         /// <summary>
-        /// Use with <c>UseAudit()</c> to enable audit for specific paths
-        /// <para>Store audit information to gRPC Audit service</para></para>
+        /// The collector's processing of every new record before it is stored (<c>Audit:Collector</c> options): the
+        /// configured headers masked (<see cref="HeaderRedactionProcessor"/>), long bodies and changes cut
+        /// (<see cref="TruncationProcessor"/>), then the app's own processors, added with
+        /// <see cref="AuditCollectorBuilder.AddProcessor{T}"/>. Also adds the collector's metrics.
+        /// Use with <see cref="ConfigureAuditGrpcHost"/>, or with <see cref="ConfigureAuditDefault"/> in-process.
         /// </summary>
-        /// <param name="services"></param>
-        /// <param name="grpcEndpoint"></param>
-        /// <returns></returns>
+        public static AuditCollectorBuilder AddAuditCollector(this IServiceCollection services,
+            Action<AuditCollectorOptions>? configure = default)
+        {
+            services.AddOptions<AuditCollectorOptions>()
+                .Configure<IServiceProvider>((options, sp) =>
+                    sp.GetService<IConfiguration>()?.GetSection("Audit:Collector").Bind(options));
+            if (configure != null)
+            {
+                services.Configure(configure);
+            }
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditRecordProcessor, HeaderRedactionProcessor>());
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditRecordProcessor, TruncationProcessor>());
+            services.AddAuditCollectorMetrics();
+            return new AuditCollectorBuilder(services);
+        }
+
+        /// <summary>
+        /// The collector's metrics (<c>juice.audit.collector.*</c> on meter <c>Juice.Audit</c>), recorded for every
+        /// batch the audit database is written with.
+        /// </summary>
+        public static IServiceCollection AddAuditCollectorMetrics(this IServiceCollection services)
+        {
+            services.TryAddSingleton<AuditCollectorMetrics>();
+            services.TryAddEnumerable(ServiceDescriptor.Singleton<IAuditBatchObserver, AuditCollectorMetrics>(
+                sp => sp.GetRequiredService<AuditCollectorMetrics>()));
+            return services;
+        }
+
+        /// <summary>
+        /// Use with <c>UseAudit()</c> to enable audit for specific paths
+        /// <para>Remote mode: access records are queued and sent in batches to the gRPC Audit service by a background
+        /// worker (<c>Audit:Export</c> options). Requests no longer wait for the audit service.</para>
+        /// </summary>
         public static IServiceCollection ConfigureAuditGrpcClient(this IServiceCollection services, Action<GrpcClientFactoryOptions> configure)
         {
-            services.AddGrpcAuditService(configure)
+            services.AddGrpcAuditExporter(configure)
                 .AddAuditContextAccessor()
                 .AddDataEventHandler();
             return services;
@@ -93,7 +129,8 @@ namespace Microsoft.Extensions.DependencyInjection
 
         /// <summary>
         /// Use with <c>UseAudit()</c> to enable audit for specific paths
-        /// <para>Store audit information to EF repository directly</para>
+        /// <para>In-process mode: access records are queued and written in batches to the app's audit database by a
+        /// background worker (<c>Audit:Export</c> options). Requests no longer wait for the write.</para>
         /// </summary>
         /// <param name="services"></param>
         /// <param name="configuration"></param>
@@ -105,8 +142,10 @@ namespace Microsoft.Extensions.DependencyInjection
         {
             services.AddDefaultAuditService()
                 .AddAuditCommandHandlers()
+                .AddAuditCollectorMetrics()
                 .AddAuditDbContext(configuration, configureDb)
                 .AddEFAuditRepos()
+                .AddInProcessAuditExporter()
                 .AddAuditContextAccessor()
                 .AddDataEventHandler();
             return services;

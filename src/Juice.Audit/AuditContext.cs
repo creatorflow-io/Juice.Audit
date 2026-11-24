@@ -18,7 +18,8 @@ namespace Juice.Audit
         private bool _requestAccessLog;
         private int[] _requestAccessLogHttpStatusCodes = Array.Empty<int>();
 
-        public bool IsRequestedForAuditLog => AuditEntries.Count > 0 || UncommittedAuditEntryCount > 0;
+        public bool IsRequestedForAuditLog => AuditEntries.Count > 0 || UncommittedAuditEntryCount > 0
+            || OutboxedChangeCount > 0;
 
         /// <summary>
         /// Changes reported inside a transaction, held until it commits. Those still here when the scope ends were never
@@ -26,7 +27,24 @@ namespace Juice.Audit
         /// </summary>
         private readonly Dictionary<Guid, List<DataAudit>> _uncommittedEntries = new();
 
-        public int UncommittedAuditEntryCount => _uncommittedEntries.Values.Sum(entries => entries.Count);
+        /// <summary>
+        /// Changes taken by a transaction's outbox (<see cref="IDataChangeSink"/>), counted until it commits. They travel
+        /// with the outbox, not with this record.
+        /// </summary>
+        private readonly Dictionary<Guid, int> _outboxedPending = new();
+
+        /// <summary>Changes carried with this record because the outbox couldn't take them.</summary>
+        private readonly HashSet<DataAudit> _bestEffort = new(ReferenceEqualityComparer.Instance);
+
+        /// <summary>Changes of transactions that never committed, held here or in their outbox.</summary>
+        public int UncommittedAuditEntryCount => _uncommittedEntries.Values.Sum(entries => entries.Count)
+            + _outboxedPending.Values.Sum();
+
+        /// <summary>Committed changes sent through the outbox; find them by trace id.</summary>
+        public int OutboxedChangeCount { get; private set; }
+
+        /// <summary>The changes in <see cref="AuditEntries"/> that the outbox couldn't take.</summary>
+        public int BestEffortChangeCount => AuditEntries.Count(_bestEffort.Contains);
 
         public Version? Version => Assembly.GetEntryAssembly()?.GetName().Version;
         public AccessLog AccessRecord { get; private set; }
@@ -74,12 +92,27 @@ namespace Juice.Audit
             entries.AddRange(auditEntries);
         }
 
-        /// <summary>The transaction committed: its changes join <see cref="AuditEntries"/>.</summary>
+        /// <summary>A change of <paramref name="transactionId"/> went into its outbox.</summary>
+        public void AddOutboxedPending(Guid transactionId)
+            => _outboxedPending[transactionId] = _outboxedPending.GetValueOrDefault(transactionId) + 1;
+
+        /// <summary>The outbox couldn't take <paramref name="entry"/>: it is carried with this record.</summary>
+        public void MarkBestEffort(DataAudit entry)
+            => _bestEffort.Add(entry);
+
+        /// <summary>
+        /// The transaction committed: its held changes join <see cref="AuditEntries"/>, and its outboxed changes are
+        /// counted as committed.
+        /// </summary>
         public void CommitAuditEntries(Guid transactionId)
         {
             if (_uncommittedEntries.Remove(transactionId, out var entries))
             {
                 AuditEntries.AddRange(entries);
+            }
+            if (_outboxedPending.Remove(transactionId, out var outboxed))
+            {
+                OutboxedChangeCount += outboxed;
             }
         }
 
@@ -117,6 +150,8 @@ namespace Juice.Audit
                     // dispose managed state (managed objects).
                     AuditEntries.Clear();
                     _uncommittedEntries.Clear();
+                    _outboxedPending.Clear();
+                    _bestEffort.Clear();
                     Items.Clear();
                     _requestAccessLogHttpStatusCodes = Array.Empty<int>();
                 }

@@ -52,5 +52,16 @@ namespace Juice.Audit.Domain.AccessLogAggregate
             Headers = Validatable.TrimExceededLength(headers, LengthConstants.ShortDescriptionLength);
             ElapsedMs = elapsedMilliseconds;
         }
+
+        /// <summary>
+        /// Replaces the recorded body, error and headers, for the collector's processors (masking, truncation) before
+        /// the record is stored.
+        /// </summary>
+        public void Rewrite(string? data, string? error, string? headers)
+        {
+            Data = data;
+            Err = error;
+            Headers = headers;
+        }
     }
 }

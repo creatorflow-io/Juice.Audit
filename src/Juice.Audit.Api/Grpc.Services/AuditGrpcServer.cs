@@ -1,6 +1,9 @@
 ﻿using Grpc.Core;
 using Juice.Audit.Commands;
 using Juice.Audit.Grpc;
+using Juice.Audit.Services;
+using GrpcBatchResult = Juice.Audit.Grpc.AuditBatchResult;
+using GrpcRecordResult = Juice.Audit.Grpc.AuditRecordResult;
 
 namespace Juice.Audit.Api.Grpc.Services
 {
@@ -11,67 +14,55 @@ namespace Juice.Audit.Api.Grpc.Services
         {
             _mediator = mediator;
         }
+
+        /// <summary>
+        /// Access records in batches (10.7). Written as the root tenant, each record under its own tenant; the result
+        /// tells, per record, whether it was stored, was already stored, was refused, or can be retried.
+        /// </summary>
+        public override async Task<GrpcBatchResult> LogBatch(AuditBatchRequest request, ServerCallContext context)
+        {
+            var reply = new GrpcBatchResult();
+            var items = new List<AuditBatchItem>(request.Items.Count);
+            foreach (var message in request.Items)
+            {
+                try
+                {
+                    items.Add(AuditMessageMapper.FromMessage(message));
+                }
+                catch (Exception ex)
+                {
+                    // An invalid record is refused alone; retrying it won't help.
+                    foreach (var id in Ids(message))
+                    {
+                        reply.Results.Add(new GrpcRecordResult
+                        {
+                            Id = id,
+                            Outcome = GrpcRecordResult.Types.Outcome.Rejected,
+                            Reason = ex.Message
+                        });
+                    }
+                }
+            }
+            if (items.Count > 0)
+            {
+                var result = await _mediator.Send(new SaveAuditBatchCommand(items), context.CancellationToken);
+                reply.Results.AddRange(result.Results.Select(AuditMessageMapper.ToMessage));
+            }
+            return reply;
+        }
+
+        private static IEnumerable<string> Ids(AuditRequest message)
+            => message.AuditEntries.Select(e => e.Id).Prepend(message.AccessLog?.Id)
+                .Where(id => !string.IsNullOrEmpty(id))!;
+
+        /// <summary>One record per call, for clients before 10.7.</summary>
         public override async Task<AuditOperationResult> Log(AuditRequest request, ServerCallContext context)
         {
             try
             {
-                var ral = request.AccessLog;
-                var accessLog = new Domain.AccessLogAggregate.AccessLog(ral.Action, ral.User, ral.TenantId);
-
-                accessLog.SetRequestInfo(new Domain.AccessLogAggregate.RequestInfo(
-                    ral.ReqMethod, ral.ReqPath, ral.ReqData.ToStringUtf8(), ral.ReqQuery,
-                    ral.ReqHeaders.ToStringUtf8(), ral.ReqScheme, ral.ReqRemoteIp, ral.ReqId, ral.ReqHost
-                    ));
-
-                if (ral.Restricted)
-                {
-                    accessLog.Restricted();
-                }
-
-                var metadata = ral.Metadata.ToStringUtf8();
-                if (!string.IsNullOrEmpty(metadata))
-                {
-                    accessLog.SetMetadataJson(metadata);
-                }
-
-                accessLog.UpdateResponseInfo(res =>
-                {
-                    if (ral.ResStatus.HasValue && ral.ResElapsed.HasValue)
-                    {
-                        res.SetResponseInfo(ral.ResStatus.Value, ral.ResHeaders.ToStringUtf8(),
-                            ral.ResElapsed.Value);
-                    }
-                    var resData = ral.ResData.ToStringUtf8();
-                    var resErr = ral.ResErr.ToStringUtf8();
-                    var resMsg = ral.ResMsg.ToStringUtf8();
-                    if (!string.IsNullOrEmpty(resData))
-                    {
-                        res.TrySetData(resData);
-                    }
-                    if (!string.IsNullOrEmpty(resErr))
-                    {
-                        res.TrySetError(resErr);
-                    }
-                    if (!string.IsNullOrEmpty(resMsg))
-                    {
-                        res.TrySetMessage(resMsg);
-                    }
-                });
-
-                accessLog.SetServerInfo(new Domain.AccessLogAggregate.ServerInfo(
-                    ral.SrvMachine, ral.SrvOS, ral.SrvAppVer, ral.SrvApp
-                ));
-
-                var auditEntries = request.AuditEntries.Select(ae =>
-                    new Domain.DataAuditAggregate.DataAudit(
-                        ae.User, ae.Datetime.ToDateTimeOffset(),
-                        ae.Action, ae.Database, ae.Schema, ae.Table,
-                        ae.KeyValues.ToStringUtf8(), ae.DataChanges.ToStringUtf8(), ae.ReqId,
-                        ae.TenantId ?? ral.TenantId
-                )).ToArray();
-
-                var saveAuditCommand = new SaveAuditInfoCommand(accessLog, auditEntries);
-                var rs = await _mediator.Send(saveAuditCommand);
+                var item = AuditMessageMapper.FromMessage(request);
+                var saveAuditCommand = new SaveAuditInfoCommand(item.AccessLog!, item.DataAudits.ToArray());
+                var rs = await _mediator.Send(saveAuditCommand, context.CancellationToken);
                 if (!rs.Succeeded)
                 {
                     return new AuditOperationResult()
