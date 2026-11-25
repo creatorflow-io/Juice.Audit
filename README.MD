@@ -132,7 +132,12 @@ app.UseAudit("ordering-api");
 with several contexts adds `AddAuditOutbox<TOther>()` for each other one. An app that already runs the delivery
 processor of `TContext` for `local` sets `AddLocalDeliveryProcessor = false`.
 
-The collector (`test/Juice.Audit.Tests.GrpcHost` is one):
+A collector that requires a key ([Running the collector](#running-the-collector)) gets it from the app's
+`Audit:Grpc:ApiKey`, sent in the `x-api-key` header of every call. An app on `ConfigureAuditGrpcClient()` adds it with
+`o.AddAuditApiKey(key)` in the client options.
+
+The collector is the image this repository builds ([Running the collector](#running-the-collector)), or your own host
+(`src/Juice.Audit.Collector/Program.cs` is one):
 
 ```csharp
 services.ConfigureAuditGrpcHost(configuration);
@@ -197,6 +202,51 @@ with one warning, against an older collector. Such a collector can't tell a rese
 it may have stored is never sent again, as before 10.7: one it refuses is lost as `rejected`, and one whose call is cut
 off as `unconfirmed`. Only a record it never received (the collector can't be reached) is retried. Then, app by app, add `AddAuditPipeline` (or `AddAuditOutbox<TContext>()`)
 and the `juice.audit` route, and subscribe the collector to it.
+
+## Running the collector
+
+`src/Juice.Audit.Collector` is the collector as a service of its own, built into an image by the Dockerfile next to it.
+It takes access records over gRPC, data changes from RabbitMQ when a broker is set, and writes both to the audit
+database it owns. An app in `InProcess` mode needs none of this.
+
+```bash
+docker build -f src/Juice.Audit.Collector/Dockerfile -t juice-audit-collector .
+docker compose -f deploy/collector/docker-compose.yml up -d --build --wait   # with PostgreSQL and RabbitMQ
+```
+
+The image builds against the released Juice packages on nuget.org. `--build-arg JUICE_PACKAGES=alpha`, with the
+`gh_user` and `gh_token` build secrets, builds against the alphas on the GitHub feed instead.
+
+| Port | Protocol | Serves |
+|---|---|---|
+| 8080 | HTTP/2 only (no TLS) | gRPC `LogBatch` and `Log`: point the apps' `Audit:Grpc:Address` here |
+| 8081 | HTTP/1.1 | `/health/live`, `/health/ready` (the audit database answers), the read API when enabled. The read API is kept to this port only while `Kestrel:Endpoints:Http:Url` names it, as the image does; otherwise it answers on every port and the collector logs a warning |
+
+| Setting | Default | |
+|---|---|---|
+| `ConnectionStrings:Audit` | | the audit database; required |
+| `Collector:Database:Provider` | | `PostgreSQL` or `SqlServer`; required |
+| `Collector:Database:Schema`, `ConnectionName` | `Audit`, `Audit` | |
+| `Collector:Database:Migrate` | `true` | brings the database to the current schema at startup. With several collectors, set it to `false` and run the image once with `--migrate` (an init container or a job), which migrates and exits |
+| `Collector:RabbitMQ:Host` | | the broker. Without it, data changes aren't consumed: apps' changes then travel best effort with their access records |
+| `Collector:RabbitMQ:Port`, `UserName`, `Password`, `VirtualHost` | 5672 | |
+| `Collector:RabbitMQ:Exchange`, `Queue` | `juice.audit`, `juice.audit` | the topic exchange the apps publish `juice.audit` to, and the queue declared, bound to it and read |
+| `Collector:Grpc:ApiKeys` | none | keys the apps must send (`Audit:Grpc:ApiKey`): printable ASCII, no spaces. Several, to replace one without downtime. None: anyone who can reach port 8080 can write records, and the collector logs a warning |
+| `Collector:ReadApi:Enabled` | `false` | maps the read API ([Reading the records](#reading-the-records-api-and-pages)) at `Collector:ReadApi:Path` (`/api/audit`) |
+| `Collector:ReadApi:Jwt:Authority`, `Audience`, `MetadataAddress`, `RequireHttpsMetadata` | | bearer token sign-in for the read API. `Audience` is required with an `Authority`: without it a token the provider issued for any other API would read every record |
+| `Collector:ReadApi:RequiredScopes` | none | the token must also grant one of these scopes (`scope` or `scp` claim); none: any token for the audience |
+| `Collector:ReadApi:AllowAnonymous` | `false` | no sign-in, only where the network already limits who can reach port 8081. An enabled read API needs this or an authority, and it can't be combined with `RequiredScopes` |
+| `Audit:Collector:*` | | the processors' options ([Options](#options)) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | , `juice-audit-collector` | exports the `Juice.Audit` meter and the request spans over OTLP |
+
+A setting that can't work (no provider, no connection string, a read API with no sign-in) stops the collector at
+startup with a message naming each key.
+
+Several collectors can read the same queue and write the same database: an id stored by one is skipped by the others.
+
+The tests in `test/Juice.Audit.Tests/CollectorContainerTests.cs` run the sample app in remote mode against the compose
+stack: committed and rolled back changes, header masking, the API key and deduplication, and a collector restart. They
+skip themselves when the stack isn't up.
 
 ## Time logging
 

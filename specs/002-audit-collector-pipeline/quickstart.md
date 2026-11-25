@@ -4,7 +4,7 @@ How to check the feature end to end once it's built. The paths are in this repo.
 
 ## 1. Remote mode (app → broker / gRPC → collector → db)
 
-**Collector**, `test/Juice.Audit.Tests.GrpcHost/Program.cs`:
+**Collector**, `src/Juice.Audit.Collector/Program.cs` (the `juice-audit-collector` image; README, "Running the collector"). It replaces `test/Juice.Audit.Tests.GrpcHost`, removed after this feature:
 
 ```csharp
 builder.Services.ConfigureAuditGrpcHost(builder.Configuration);

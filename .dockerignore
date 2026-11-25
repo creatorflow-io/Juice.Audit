@@ -23,3 +23,10 @@
 **/values.dev.yaml
 LICENSE
 README.md
+**/TestResults
+build
+console
+specs
+.specify
+.claude
+temp
