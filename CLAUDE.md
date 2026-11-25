@@ -4,7 +4,7 @@ Auto-generated from all feature plans. Last updated: 2026-11-19
 
 ## Active Technologies
 
-- C# latest on `net6.0;net8.0;net9.0;net10.0` (tests `net8.0;net9.0;net10.0`) + Juice 10.10 (Juice.MediatR, Juice.EF, Juice.Messaging, Juice.Messaging.Outbox, Juice.Messaging.Local), gRPC 2.76, System.Threading.Channels (002-audit-collector-pipeline)
+- C# latest on `net6.0;net8.0;net9.0;net10.0` (tests `net8.0;net9.0;net10.0`) + Juice 10.15 (Juice.MediatR, Juice.EF, Juice.Messaging, Juice.Messaging.Outbox, Juice.Messaging.Local), gRPC 2.76, System.Threading.Channels (002-audit-collector-pipeline)
 - `AuditDbContext` on PostgreSQL or SQL Server; tables unchanged (002-audit-collector-pipeline)
 
 ## Project Structure

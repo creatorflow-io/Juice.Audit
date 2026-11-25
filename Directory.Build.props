@@ -29,10 +29,10 @@
     <XUnitRunnerVersion>3.*</XUnitRunnerVersion>
     <TestSdk>17.13.*</TestSdk>
     <JuiceRefSuffix Condition="'$(JuiceRefSuffix)' == '' And '$(CI)' == ''">-alpha.*</JuiceRefSuffix>
-    <JuiceVersion>10.10.*$(JuiceRefSuffix)</JuiceVersion>
+    <JuiceVersion>10.15.*$(JuiceRefSuffix)</JuiceVersion>
     <JuiceMeasurement>10.1.*$(JuiceRefSuffix)</JuiceMeasurement>
     <!-- Juice.Audit.Messaging only: IIntegrationEventPipelineBehavior is new in Juice.Messaging 10.9. -->
-    <JuiceMessagingVersion>10.10.*$(JuiceRefSuffix)</JuiceMessagingVersion>
+    <JuiceMessagingVersion>10.15.*$(JuiceRefSuffix)</JuiceMessagingVersion>
   </PropertyGroup>
 
   <PropertyGroup Label="Versioning" Condition="'$(TargetFramework)' == 'net10.0'">

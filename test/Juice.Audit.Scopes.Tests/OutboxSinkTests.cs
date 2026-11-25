@@ -260,19 +260,31 @@ namespace Juice.Audit.Scopes.Tests
                 var failing = () => mediator.Send(new PlaceOrders(1, WithLine: true, Number: "ROLLED-")).AsTask();
                 await failing.Should().ThrowAsync<InvalidOperationException>();
                 switches.FailOnLine = false;
-                // Core keeps the failed transaction's tracked changes and pending audit entries on the context, and
-                // replays them into the next one (a core follow-up). Reset them, so this checks the outbox alone.
-                var context = services.GetRequiredService<SampleOrderContext>();
-                context.ChangeTracker.Clear();
-                context.PendingAuditEntries.Clear();
-                // The same scope goes on, as a job loop or a request that handles the error would.
+                // The same scope goes on, as a job loop or a request that handles the error would. Since Juice 10.15
+                // (creatorflow-io/Juice#126) the failed command leaves nothing on the context or the outbox.
                 await mediator.Send(new PlaceOrders(1, Number: "KEPT-"));
             });
 
             var events = _db.OutboxEvents();
-            events.Should().HaveCount(2, "the rolled back event is still pending, and saved with the next");
+            events.Should().ContainSingle("the rolled back event was discarded with its command");
             events.SelectMany(e => e.Entries).Select(e => e.Changes).Should().ContainSingle()
-                .Which.Should().Contain("KEPT-0", "the rolled back event is written without its changes");
+                .Which.Should().Contain("KEPT-0", "only the next transaction's change is stored");
+        }
+
+        [Fact(DisplayName = "T-OUTBOX-2: an event still pending when another transaction saves the outbox is written without its changes")]
+        public void A_pending_event_of_another_transaction_has_no_changes()
+        {
+            // The guard for a Juice before 10.15, whose failed command left its outbox events pending.
+            var evt = new DataChangesAudited { Entries = { new DataChangeEntry { Tbl = "Orders" } } };
+
+            evt.IsInTransaction = () => true;
+            evt.ShouldSerializeEntries().Should().BeTrue("its own transaction saves it");
+            evt.IsInTransaction = () => false;
+            evt.ShouldSerializeEntries().Should().BeFalse("another transaction saves it: its changes were rolled back");
+            evt.IsInTransaction = () => throw new ObjectDisposedException("context");
+            evt.ShouldSerializeEntries().Should().BeTrue("its scope is gone: kept, as without the guard");
+            evt.IsInTransaction = null;
+            evt.ShouldSerializeEntries().Should().BeTrue();
         }
 
         [Fact(DisplayName = "T-OUTBOX-6: the same event consumed twice stores each change once, and isn't audited itself")]
