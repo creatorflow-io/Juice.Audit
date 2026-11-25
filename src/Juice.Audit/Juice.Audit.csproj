@@ -10,6 +10,8 @@
     <ItemGroup>
         <PackageReference Include="Juice" Version="$(JuiceVersion)" />
         <PackageReference Include="Juice.MediatR" Version="$(JuiceVersion)" />
+        <!-- MessageContext: the export worker is an entry point of its own (InProcessAuditExporter). -->
+        <PackageReference Include="Juice.Messaging" Version="$(JuiceMessagingVersion)" />
         <Using Include="Juice.MediatR"/>
     </ItemGroup>
     <ItemGroup>

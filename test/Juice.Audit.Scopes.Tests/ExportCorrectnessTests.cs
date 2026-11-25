@@ -129,6 +129,58 @@ namespace Juice.Audit.Scopes.Tests
             exporter.Calls.Should().Be(5);
         }
 
+        [Fact(DisplayName = "In-process, a batch is saved in a message context of its own: an app's behavior that needs one doesn't drop every record")]
+        public async Task In_process_batches_have_a_message_context_Async()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddMediatR();
+            services.AddInProcessAuditExporter();
+            services.Configure<AuditExportOptions>(o => o.MaxBatchAge = TimeSpan.FromMilliseconds(20));
+            services.AddScoped<IRequestHandler<SaveAuditBatchCommand, AuditBatchResult>, StoringBatchHandler>();
+            // As a TransactionBehavior that saves its outbox for every command (Juice.Observability's does).
+            services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ContextReadingBehavior<,>));
+            using var provider = services.BuildServiceProvider();
+            using var meter = new MeterRecorder(provider.GetRequiredService<AuditExportMetrics>().Meter);
+            var worker = provider.GetServices<IHostedService>().OfType<AuditExportWorker>().Single();
+            await worker.StartAsync(default);
+
+            await PersistAsync(provider, new AccessLog("action", "user"), Data());
+
+            await EventuallyAsync(() => meter.Sum("juice.audit.export.records", ("outcome", "exported")) == 1
+                || meter.Sum("juice.audit.export.records", ("outcome", "dropped")) > 0);
+            await worker.StopAsync(default);
+            meter.Sum("juice.audit.export.records", ("outcome", "dropped")).Should().Be(0);
+            ContextReadingBehavior<SaveAuditBatchCommand, AuditBatchResult>.Sources.Should()
+                .Contain(InProcessAuditExporter.ContextSource);
+        }
+
+        /// <summary>Reads the message context, as an outbox save does; throws without one.</summary>
+        private sealed class ContextReadingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        {
+            public static readonly System.Collections.Concurrent.ConcurrentBag<string> Sources = new();
+            public int Order => 0;
+
+            public ValueTask<TResponse> Handle(TRequest request, RequestHandlerDelegate<TRequest, TResponse> next,
+                CancellationToken cancellationToken)
+            {
+                Sources.Add(Juice.Messaging.MessageContext.Current.Source);
+                return next.Invoke(request, cancellationToken);
+            }
+        }
+
+        /// <summary>Stores every record of a batch.</summary>
+        private sealed class StoringBatchHandler : IRequestHandler<SaveAuditBatchCommand, AuditBatchResult>
+        {
+            public ValueTask<AuditBatchResult> Handle(SaveAuditBatchCommand request, CancellationToken cancellationToken)
+                => ValueTask.FromResult(new AuditBatchResult(request.Items.SelectMany(i =>
+                    (i.AccessLog is { } log
+                        ? new[] { new AuditRecordResult(log.Id, AuditRecordKind.Access, AuditRecordOutcome.Stored) }
+                        : Array.Empty<AuditRecordResult>())
+                        .Concat(i.DataAudits.Select(e =>
+                            new AuditRecordResult(e.Id, AuditRecordKind.Data, AuditRecordOutcome.Stored)))).ToList()));
+        }
+
         private static async Task EventuallyAsync(Func<bool> condition)
         {
             var watch = Stopwatch.StartNew();
