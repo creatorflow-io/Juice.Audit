@@ -155,6 +155,63 @@ namespace Juice.Audit.Tests
             withAddress.Should().NotThrow();
         }
 
+        [Theory(DisplayName = "Remote mode: Audit:Grpc:ApiKey empty means none; a blank or unusable one fails at registration")]
+        [InlineData("", true)]
+        [InlineData("local-collector-key", true)]
+        [InlineData(" ", false)]
+        [InlineData("s3crét", false)]
+        public void Remote_mode_checks_the_api_key(string key, bool accepted)
+        {
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Audit:Mode"] = "Remote",
+                    ["Audit:Grpc:Address"] = "http://audit:8080",
+                    ["Audit:Grpc:ApiKey"] = key
+                })
+                .Build();
+
+            var register = () => new ServiceCollection()
+                .AddMessaging(m => m.AddAuditPipeline<SampleOrderContext>(configuration));
+
+            if (accepted)
+            {
+                register.Should().NotThrow();
+            }
+            else
+            {
+                register.Should().Throw<ArgumentException>().Which.Message.Should().Contain("printable ASCII");
+            }
+        }
+
+        [Fact(DisplayName = "ConfigureAuditGrpcClient: the options apply when the client is made, so they may read later settings")]
+        public void ConfigureAuditGrpcClient_applies_its_options_late()
+        {
+            // An app whose settings are filled after registration: the delegate must not run before then.
+            string? address = null;
+            var key = "s3crét";
+            var services = new ServiceCollection().AddLogging().ConfigureAuditGrpcClient(o =>
+            {
+                o.Address = new Uri(address!);
+                o.AddAuditApiKey(key);
+            });
+            address = "http://audit:8080";
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var make = () => provider.GetRequiredService<Juice.Audit.Grpc.AuditGrpcService.AuditGrpcServiceClient>();
+                make.Should().Throw<ArgumentException>("the export worker logs this at Warning")
+                    .Which.Message.Should().Contain("printable ASCII");
+            }
+
+            key = "local-collector-key";
+            using (var provider = services.BuildServiceProvider())
+            {
+                provider.GetRequiredService<Juice.Audit.Grpc.AuditGrpcService.AuditGrpcServiceClient>()
+                    .Should().NotBeNull();
+            }
+        }
+
         private sealed class SlowStore : IAuditBatchStore
         {
             private readonly IAuditBatchStore _inner;

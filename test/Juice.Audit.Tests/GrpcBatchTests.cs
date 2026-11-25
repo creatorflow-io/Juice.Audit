@@ -110,6 +110,101 @@ namespace Juice.Audit.Tests
             state.UseUnary.Should().BeTrue();
         }
 
+        [Fact(DisplayName = "A collector that refuses the key: the batch fails for a retry, with one warning a minute")]
+        public async Task A_refused_key_is_logged_and_retried_Async()
+        {
+            var (app, channel) = await StartAsync(a => a.MapGrpcService<KeyedCollector>());
+            await using var _ = app;
+            var logger = new CountingLogger();
+            var state = new GrpcExportState();
+            var batch = new[] { new AuditExportItem(Access(), Array.Empty<DataAudit>()) };
+
+            for (var i = 0; i < 3; i++)
+            {
+                var export = () => Exporter(channel, logger, state: state).ExportAsync(batch, default);
+                (await export.Should().ThrowAsync<RpcException>()).Which.StatusCode
+                    .Should().Be(StatusCode.Unauthenticated, "the worker retries it like any failed call");
+            }
+            logger.Warnings.Should().Be(1, "the refusal is logged once a minute, not once per attempt");
+            state.UseUnary.Should().BeFalse();
+        }
+
+        [Fact(DisplayName = "One record per call: a refused key is warned about, and the record it was sent is not resent")]
+        public async Task A_refused_key_one_by_one_is_warned_Async()
+        {
+            var (app, channel) = await StartAsync(a => a.MapGrpcService<KeyedCollector>());
+            await using var _ = app;
+            var logger = new CountingLogger();
+            var state = new GrpcExportState();
+            state.SwitchToUnary(); // as after an old instance answered Unimplemented
+            var batch = new[] { new AuditExportItem(Access(), new[] { Data() }), new AuditExportItem(Access(), Array.Empty<DataAudit>()) };
+
+            var result = await Exporter(channel, logger, state: state).ExportAsync(batch, default);
+
+            // A collector before 10.7 may refuse after storing the data changes: as any failed call, the record sent
+            // is not resent, and the rest waits for the next attempt.
+            result.Results.Take(2).Should().OnlyContain(r => r.Outcome == AuditRecordOutcome.Unconfirmed);
+            result.Results.Skip(2).Should().ContainSingle().Which.Outcome.Should().Be(AuditRecordOutcome.Retryable);
+            logger.Warnings.Should().Be(1, "the refusal is said, even on this path");
+        }
+
+        [Fact(DisplayName = "One record per call: the collector's key check refusal leaves every record retryable")]
+        public async Task A_key_check_refusal_one_by_one_is_retryable_Async()
+        {
+            var (app, channel) = await StartAsync(a => a.MapGrpcService<KeyCheckingCollector>());
+            await using var _ = app;
+            var logger = new CountingLogger();
+            var state = new GrpcExportState();
+            state.SwitchToUnary();
+            var batch = new[] { new AuditExportItem(Access(), new[] { Data() }), new AuditExportItem(Access(), Array.Empty<DataAudit>()) };
+
+            var result = await Exporter(channel, logger, state: state).ExportAsync(batch, default);
+
+            result.Results.Should().HaveCount(3).And.OnlyContain(r => r.Outcome == AuditRecordOutcome.Retryable,
+                "the key check refused the call before the service ran: nothing was stored");
+            logger.Warnings.Should().Be(1);
+        }
+
+        /// <summary>Refuses as the collector's key check does: with the trailer that says nothing was stored.</summary>
+        private sealed class KeyCheckingCollector : AuditGrpcService.AuditGrpcServiceBase
+        {
+            private static RpcException Refused() => new(
+                new Status(StatusCode.Unauthenticated, "The x-api-key header is missing."),
+                new Metadata { { AuditGrpcClientOptionsExtensions.KeyRefusedTrailer, AuditGrpcClientOptionsExtensions.KeyRefusedValue } });
+
+            public override Task<Juice.Audit.Grpc.AuditBatchResult> LogBatch(AuditBatchRequest request,
+                ServerCallContext context) => throw Refused();
+
+            public override Task<AuditOperationResult> Log(AuditRequest request, ServerCallContext context)
+                => throw Refused();
+        }
+
+        [Theory(DisplayName = "AddAuditApiKey refuses a key that can't travel as a header")]
+        [InlineData("")]
+        [InlineData(" key")]
+        [InlineData("key ")]
+        [InlineData("s3crét")]
+        [InlineData("a\tb")]
+        public void An_unusable_key_is_refused_at_configuration(string key)
+        {
+            var configure = () => new global::Grpc.Net.ClientFactory.GrpcClientFactoryOptions().AddAuditApiKey(key);
+            configure.Should().Throw<ArgumentException>().Which.Message.Should().Contain("printable ASCII");
+            AuditGrpcClientOptionsExtensions.IsValidApiKey("local-collector-key_2+/=").Should().BeTrue();
+        }
+
+        /// <summary>A collector whose key the app doesn't have: it refuses every call before the service runs.</summary>
+        private sealed class KeyedCollector : AuditGrpcService.AuditGrpcServiceBase
+        {
+            private static RpcException Refused() =>
+                new(new Status(StatusCode.Unauthenticated, "The x-api-key header is missing."));
+
+            public override Task<Juice.Audit.Grpc.AuditBatchResult> LogBatch(AuditBatchRequest request,
+                ServerCallContext context) => throw Refused();
+
+            public override Task<AuditOperationResult> Log(AuditRequest request, ServerCallContext context)
+                => throw Refused();
+        }
+
         [Fact(DisplayName = "A hanging collector is cut off at ExportTimeout")]
         public async Task A_hanging_collector_is_cut_off_at_the_deadline_Async()
         {

@@ -2,6 +2,7 @@ using Grpc.Core;
 using Juice.Audit.Commands;
 using Juice.Audit.Export;
 using Juice.Audit.Grpc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using AuditBatchResult = Juice.Audit.Commands.AuditBatchResult;
@@ -40,6 +41,11 @@ namespace Juice.Audit.Services
             Interlocked.Exchange(ref _unaryUntil, DateTime.UtcNow.Add(_retryBatchAfter).Ticks);
             return Interlocked.Exchange(ref _switched, 1) == 0;
         }
+
+        private readonly WarningThrottle _refused = new(TimeSpan.FromMinutes(1));
+
+        /// <summary><c>true</c> at most once a minute: the collector refused the records (a missing or wrong key).</summary>
+        public bool ShouldWarnRefused() => _refused.ShouldWarn();
     }
 
     /// <summary>
@@ -89,6 +95,12 @@ namespace Juice.Audit.Services
                             "Upgrade the collector to Juice.Audit {Version} or later.", MinimumCollectorVersion);
                     }
                 }
+                catch (RpcException ex) when (IsRefused(ex))
+                {
+                    // Retried as any failure, but it won't pass until the key is fixed: say so.
+                    WarnRefused(ex);
+                    throw;
+                }
             }
             return await ExportOneByOneAsync(batch, deadline, cancellationToken);
         }
@@ -101,6 +113,10 @@ namespace Juice.Audit.Services
         /// <item><c>Succeeded = false</c>: refused (<see cref="AuditRecordOutcome.Rejected"/>). The collector gives
         /// every error so, and its data changes may already be stored.</item>
         /// <item>The collector can't be reached (<see cref="StatusCode.Unavailable"/>): retried, with the rest.</item>
+        /// <item>The collector's key check refuses the call, before its service runs (the
+        /// <c>juice-audit-refused</c> trailer): retried, with the rest, and a warning.</item>
+        /// <item>Any other <see cref="StatusCode.Unauthenticated"/>, <see cref="StatusCode.PermissionDenied"/>: as a
+        /// call cut off below, with the same warning.</item>
         /// <item>The call is cut off (its deadline, a reset): <see cref="AuditRecordOutcome.Unconfirmed"/>; the rest
         /// is retried.</item>
         /// </list>
@@ -143,8 +159,23 @@ namespace Juice.Audit.Services
                         outcome = AuditRecordOutcome.Retryable;
                         reason = stopped;
                     }
+                    catch (RpcException ex) when (AuditGrpcClientOptionsExtensions.IsKeyRefusal(ex))
+                    {
+                        // The collector's key check refused it before its service ran: surely not stored, so
+                        // retried, with the rest, once the key is fixed.
+                        WarnRefused(ex);
+                        stopped = ex.Status.Detail;
+                        outcome = AuditRecordOutcome.Retryable;
+                        reason = $"{ex.StatusCode}: {ex.Status.Detail}";
+                    }
                     catch (RpcException ex)
                     {
+                        // Any other refusal is said, but not resent: this path serves collectors before 10.7, whose
+                        // own code (or a proxy in front) may refuse a record after its data changes were stored.
+                        if (IsRefused(ex))
+                        {
+                            WarnRefused(ex);
+                        }
                         // Received, perhaps stored: not sent again. The collector is in trouble; the rest waits.
                         stopped = ex.Status.Detail;
                         outcome = AuditRecordOutcome.Unconfirmed;
@@ -164,6 +195,24 @@ namespace Juice.Audit.Services
                     new RecordResult(e.Id, AuditRecordKind.Data, outcome, reason)));
             }
             return new AuditBatchResult(results);
+        }
+
+        /// <summary>A refusal: the key check's own (<see cref="AuditGrpcClientOptionsExtensions.IsKeyRefusal"/>), or another.</summary>
+        private static bool IsRefused(RpcException ex)
+            => ex.StatusCode is StatusCode.Unauthenticated or StatusCode.PermissionDenied;
+
+        /// <summary>
+        /// Once a minute, rather than only counting the records lost: the records won't pass until the key is fixed.
+        /// </summary>
+        private void WarnRefused(RpcException ex)
+        {
+            if (_state.ShouldWarnRefused())
+            {
+                // Not "retried": a refusal that isn't the collector's key check drops the record at once.
+                _logger.LogWarning("The audit collector refused the records ({Status}: {Detail}). Set " +
+                    "Audit:Grpc:ApiKey (or AddAuditApiKey) to one of the collector's Collector:Grpc:ApiKeys; until " +
+                    "then refused records are lost once their retries, if any, run out.", ex.StatusCode, ex.Status.Detail);
+            }
         }
 
         private static AuditBatchResult FromReply(IReadOnlyList<AuditExportItem> batch, Juice.Audit.Grpc.AuditBatchResult reply)

@@ -49,6 +49,12 @@ namespace Microsoft.Extensions.DependencyInjection
         public const string GrpcAddressKey = "Audit:Grpc:Address";
 
         /// <summary>
+        /// Remote only: the key sent in the <c>x-api-key</c> header of every call, for a collector that requires one
+        /// (<c>Collector:Grpc:ApiKeys</c>).
+        /// </summary>
+        public const string GrpcApiKeyKey = "Audit:Grpc:ApiKey";
+
+        /// <summary>
         /// The whole audit pipeline for an app whose data changes run in <typeparamref name="TContext"/>'s transactions,
         /// in the mode <c>Audit:Mode</c> names (FR-022): <c>Remote</c> or <c>InProcess</c>. Switching needs no code
         /// change. The mode has no default: a missing or unknown value fails here, so a remote app can't fall into
@@ -82,11 +88,17 @@ namespace Microsoft.Extensions.DependencyInjection
 
                 case AuditMode.Remote:
                     var address = configuration[GrpcAddressKey];
+                    var apiKey = configuration[GrpcApiKeyKey];
                     void Client(GrpcClientFactoryOptions o)
                     {
                         if (!string.IsNullOrWhiteSpace(address))
                         {
                             o.Address = new Uri(address);
+                        }
+                        // Empty means no key; anything else must be usable, blanks included (a secret left unfilled).
+                        if (!string.IsNullOrEmpty(apiKey))
+                        {
+                            o.AddAuditApiKey(apiKey);
                         }
                         options.ConfigureGrpcClient?.Invoke(o);
                     }

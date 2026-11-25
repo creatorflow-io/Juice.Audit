@@ -82,6 +82,8 @@ namespace Microsoft.Extensions.DependencyInjection
         public static IServiceCollection AddGrpcAuditExporter(this IServiceCollection services,
             Action<GrpcClientFactoryOptions> configure)
         {
+            // The client factory applies configure when the export worker first needs the client, so a delegate may
+            // read what is set after registration. Options that can't work are logged then (AuditExportWorker).
             services.AddGrpcClient<Juice.Audit.Grpc.AuditGrpcService.AuditGrpcServiceClient>(configure);
             services.TryAddSingleton<GrpcExportState>();
             services.Replace(ServiceDescriptor.Scoped<IAuditExporter, GrpcAuditExporter>());

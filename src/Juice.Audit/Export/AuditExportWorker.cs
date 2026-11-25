@@ -174,7 +174,7 @@ namespace Juice.Audit.Export
                 try
                 {
                     using var scope = _scopes.CreateScope();
-                    var exporter = scope.ServiceProvider.GetRequiredService<IAuditExporter>();
+                    var exporter = CreateExporter(scope.ServiceProvider);
                     var result = await exporter.ExportAsync(pending, call);
                     var before = pending.Count;
                     pending = Settle(pending, result);
@@ -224,6 +224,31 @@ namespace Juice.Audit.Export
                 {
                     return pending;
                 }
+            }
+        }
+
+        private readonly WarningThrottle _exporterWarning = new(TimeSpan.FromMinutes(1));
+
+        /// <summary>
+        /// The exporter. In remote mode it brings the gRPC client, whose options (the app's <c>ConfigureAuditGrpcClient</c>
+        /// delegate, <c>AddAuditApiKey</c>) apply only now. Options that can't work fail every export: said at Warning
+        /// once a minute, as the failed attempts are logged at Debug only.
+        /// </summary>
+        private IAuditExporter CreateExporter(IServiceProvider services)
+        {
+            try
+            {
+                return services.GetRequiredService<IAuditExporter>();
+            }
+            catch (Exception ex)
+            {
+                if (_exporterWarning.ShouldWarn())
+                {
+                    _logger.LogWarning(ex, "The audit exporter can't be created, so no audit record can be sent. Remote mode: check " +
+                        "the audit client's options (Audit:Grpc:*, ConfigureAuditGrpcClient, AddAuditApiKey); in-process: the audit " +
+                        "database and the mediator.");
+                }
+                throw;
             }
         }
 
