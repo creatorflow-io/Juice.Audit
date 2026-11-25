@@ -11,7 +11,9 @@ Auto-generated from all feature plans. Last updated: 2026-11-19
 
 ```text
 src/      Juice.Audit, .Api, .Api.Contracts, .AspNetCore, .EF, .EF.PostgreSQL, .EF.SqlServer, .Messaging
-test/     Juice.Audit.Tests, .Scopes.Tests, .Tests.Host, .Tests.GrpcHost
+          Juice.Audit.Collector (the collector host and its Dockerfile; net10.0, not packed)
+deploy/   collector/docker-compose.yml: collector + PostgreSQL + RabbitMQ, for CollectorContainerTests
+test/     Juice.Audit.Tests, .Scopes.Tests, .Tests.Host
 specs/    speckit features
 console/  @juice-js/audit Angular pages
 ```

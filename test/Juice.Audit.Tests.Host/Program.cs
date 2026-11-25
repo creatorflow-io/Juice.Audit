@@ -53,7 +53,13 @@ if (!string.IsNullOrEmpty(rabbit["Host"]))
 builder.Services.AddExecutionTimeMeasurement();
 builder.Services.AddMeasurementEFStores(builder.Configuration, options =>
 {
-    //options.DatabaseProvider = "SqlServer";
+    // The time store's database: SQL Server unless Measurement:DatabaseProvider names another (the collector
+    // end-to-end tests use the collector stack's PostgreSQL).
+    var provider = builder.Configuration["Measurement:DatabaseProvider"];
+    if (!string.IsNullOrWhiteSpace(provider))
+    {
+        options.DatabaseProvider = provider;
+    }
 });
 
 builder.Services.AddMediatR(options => { options.RegisterServicesFromAssemblyContaining<Program>(); });

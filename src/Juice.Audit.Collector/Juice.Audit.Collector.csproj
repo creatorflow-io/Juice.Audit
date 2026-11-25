@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- The audit collector as a service of its own: the image the Dockerfile next to this file builds. It receives
+       access records over gRPC and data changes from RabbitMQ, and stores them in the audit database it owns.
+       A host, not a package. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Juice.Audit.Collector</AssemblyName>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Juice.Audit.Api\Juice.Audit.Api.csproj" />
+    <ProjectReference Include="..\Juice.Audit.Messaging\Juice.Audit.Messaging.csproj" />
+    <ProjectReference Include="..\Juice.Audit.EF.PostgreSQL\Juice.Audit.EF.PostgreSQL.csproj" />
+    <ProjectReference Include="..\Juice.Audit.EF.SqlServer\Juice.Audit.EF.SqlServer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Juice.EventBus.RabbitMQ" Version="$(JuiceMessagingVersion)" />
+    <PackageReference Include="Juice.Messaging.Idempotency.Caching" Version="$(JuiceMessagingVersion)" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.15" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
+  </ItemGroup>
+
+</Project>
